@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pandas
+numpy
+python-multipart
+openpyxl
+scipy
+jinja2
+requests
+httpx

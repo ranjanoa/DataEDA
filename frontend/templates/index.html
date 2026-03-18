@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiln Dashboard - Ultimate EDA</title>
+  <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+  <link rel="stylesheet" href="/static/css/output.css">
+</head>
+
+<body class="bg-gray-100 text-gray-800 font-sans p-4 lg:p-6">
+  <div class="max-w-7xl mx-auto space-y-6">
+    <header class="bg-white p-6 rounded-lg shadow-md">
+      <h1 class="text-2xl font-bold text-gray-800">Kiln Dashboard - Process Analysis</h1>
+      <p class="text-sm text-gray-600 mt-1">Load CSV/XLSX data & LEGEND.csv. Explore correlations, trends, stability, and create custom plots.</p>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Left Column: Data Loading & Controls -->
+      <div class="bg-white p-6 rounded-lg shadow-md lg:col-span-1 space-y-4">
+        <h2 class="text-lg font-semibold border-b pb-2 mb-4">Data Loading</h2>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="fileData">Data Files (CSV/XLSX)</label>
+          <input type="file" id="fileData" accept=".csv,.xlsx,.xls" multiple class="block w-full text-sm text-gray-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="fileLegend">LEGEND File (CSV)</label>
+          <input type="file" id="fileLegend" accept=".csv,text/csv" class="block w-full text-sm text-gray-500" />
+        </div>
+        <button id="btnMergeAndProcess" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150">Merge & Process Data</button>
+        <div class="flex items-center space-x-2 text-sm">
+          <label for="minNonZero" class="text-gray-600">Exclude cols &lt;</label>
+          <input id="minNonZero" type="number" value="25" min="0" max="100" class="w-16 px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          <span class="text-gray-600">% non-zero values</span>
+        </div>
+        <div id="status" class="text-sm text-gray-500 mt-2">Status: waiting for files</div>
+        <div class="flex flex-wrap gap-2 pt-2 border-t mt-4">
+          <button id="btnDownloadCorr" disabled class="bg-gray-200 text-gray-700 text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">Download Correlations</button>
+          <button id="btnRenderAll" disabled class="bg-gray-200 text-gray-700 text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">Render All Plots Grid</button>
+          <button id="btnOpenOptimizer" disabled class="bg-gray-200 text-gray-700 text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">SFC Optimizer (Disabled)</button>
+        </div>
+
+        <div class="mt-4 border-t pt-4">
+          <h3 class="text-sm font-semibold text-gray-800 mb-2">Add Additional Dataset (aligned to base time)</h3>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="fileDataExtra">Extra Data (CSV/XLSX)</label>
+          <input type="file" id="fileDataExtra" accept=".csv,.xlsx,.xls" multiple class="block w-full text-sm text-gray-500" />
+          <div class="flex items-center gap-2 mt-2">
+            <label class="text-xs text-gray-600">Interpolation:</label>
+            <select id="extraInterpMethod" class="px-2 py-1 border border-gray-300 rounded-md text-xs">
+              <option value="linear" selected>Linear</option>
+              <option value="nearest">Nearest</option>
+              <option value="ffill">Forward-fill</option>
+              <option value="bfill">Backward-fill</option>
+            </select>
+            <label class="text-xs text-gray-600">Gap limit (min):</label>
+            <input id="extraGapLimitMin" type="number" min="0" step="1" class="w-20 px-2 py-1 border border-gray-300 rounded-md text-xs" placeholder="e.g. 240" />
+          </div>
+
+          <div class="mt-3">
+            <label class="text-xs font-medium text-gray-700">Per-file variable suffixes (optional)</label>
+            <div id="extraSuffixList" class="mt-1 space-y-1 text-xs">
+              <i class="text-gray-500">Select extra dataset file(s) to configure suffixes.</i>
+            </div>
+            <div class="flex items-center gap-2 mt-2">
+              <label class="text-xs text-gray-600">Preset:</label>
+              <select id="suffixPreset" class="px-2 py-1 border border-gray-300 rounded-md text-xs">
+                <option value="none" selected>(none)</option>
+                <option value="inout">Input/Output (__in, __out)</option>
+                <option value="enumerate">Enumerate (__f1, __f2, ...)</option>
+              </select>
+              <button id="applySuffixPreset" type="button" class="bg-gray-200 text-gray-700 text-xs font-medium py-1 px-2 rounded-md hover:bg-gray-300">Apply</button>
+            </div>
+          </div>
+
+          <button id="btnAddDataset" class="mt-2 bg-blue-500 text-white text-xs font-medium py-1.5 px-3 rounded-md hover:bg-blue-600">Add dataset & align</button>
+          <div id="extraStatus" class="text-xs text-gray-500 mt-1"></div>
+        </div>
+
+        <div class="mt-4 border-t pt-4">
+          <h3 class="text-sm font-semibold text-gray-800 mb-2">Export & Session</h3>
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <button id="btnExportCSV" class="bg-indigo-500 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-indigo-600 text-center">Export CSV</button>
+            <button id="btnExportXLSX" class="bg-indigo-500 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-indigo-600 text-center">Export Excel</button>
+          </div>
+          <div class="flex gap-2">
+            <button id="btnSaveSession" class="flex-1 bg-green-600 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-green-700">Save Session</button>
+            <button id="btnLoadSessionTrigger" class="flex-1 bg-gray-600 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-gray-700">Load</button>
+            <input type="file" id="fileLoadSession" accept=".json" class="hidden" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Derived Variables & Plot Creator -->
+      <div class="lg:col-span-2 space-y-6">
+        <!-- Derived Variables Box -->
+        <div class="bg-white p-6 rounded-lg shadow-md space-y-4" id="derivedBox">
+          <h2 class="text-lg font-semibold border-b pb-2 mb-4">Derived Variables</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+            <input id="derivedName" placeholder="Name (e.g. SFC)" class="col-span-1 md:col-span-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            <input id="derivedExpr" placeholder="Expression (e.g., Coal_Feed / Clinker_Prod)" class="col-span-1 md:col-span-2 lg:col-span-3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" />
+            <input id="derivedUnit" placeholder="Unit" class="col-span-1 md:col-span-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
+            <input id="derivedMin" placeholder="Legend Min" class="col-span-1 md:col-span-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
+            <input id="derivedMax" placeholder="Legend Max" class="col-span-1 md:col-span-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
+            <div class="col-span-1 md:col-span-3 lg:col-span-3 flex gap-2 justify-end">
+              <button id="btnTestDerived" class="bg-yellow-500 text-white text-xs font-medium py-1.5 px-3 rounded-md hover:bg-yellow-600">Test</button>
+              <button id="btnAddDerived" class="bg-green-600 text-white text-xs font-medium py-1.5 px-3 rounded-md hover:bg-green-700">Add</button>
+            </div>
+          </div>
+          <div id="derivedMsg" class="mt-2 text-sm text-gray-600"></div>
+          <div id="derivedList" class="mt-4 max-h-48 overflow-y-auto border-t pt-4 space-y-2"></div>
+        </div>
+
+        <!-- Custom Plot Creator Box -->
+        <div class="bg-white p-6 rounded-lg shadow-md space-y-4" id="customPlotBox">
+          <h2 class="text-lg font-semibold border-b pb-2 mb-4">Custom Plot Creator</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+            <div>
+              <label for="plotType" class="block text-sm font-medium text-gray-700">Plot Type</label>
+              <select id="plotType" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+                <option value="time">Time-series (Y vs Time)</option>
+                <option value="multi">Multi overlay (multiple Y vs Time)</option>
+                <option value="scatter">X vs Y scatter</option>
+                <option value="dual">Dual-Y (scatter)</option>
+                <option value="3d">3D scatter (X, Y, Z)</option>
+                <option value="parallel">Parallel Coordinates</option>
+              </select>
+            </div>
+            <div>
+              <label for="xSelect" class="block text-sm font-medium text-gray-700">X-Axis</label>
+              <select id="xSelect" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+                <option value="timestamp">timestamp</option>
+              </select>
+            </div>
+            <div class="lg:col-span-2">
+              <div class="flex justify-between items-center">
+                <label for="ySelect" class="block text-sm font-medium text-gray-700">Y-Axis (Select multiple)</label>
+                <button id="btnSelectAllY" class="bg-gray-200 text-gray-700 text-xs font-medium py-1 px-2 rounded-md hover:bg-gray-300">Select All</button>
+              </div>
+              <select id="ySelect" multiple size="4" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"></select>
+            </div>
+            <div>
+              <label for="rightAxisSelect" class="block text-sm font-medium text-gray-700">Right Y-Axis (for Dual-Y)</label>
+              <select id="rightAxisSelect" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+                  <option value="">(none)</option>
+              </select>
+            </div>
+            <div>
+                <label for="secondaryColorDomain" class="block text-sm font-medium text-gray-700">Secondary color domain</label>
+                <select id="secondaryColorDomain" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+                    <option value="data">Data min–max</option>
+                    <option value="legend">Legend range</option>
+                </select>
+            </div>
+            <div class="col-span-full">
+              <label for="useLegendRanges" class="flex items-center gap-2 mt-2 text-sm font-medium text-gray-700 cursor-pointer">
+                <input type="checkbox" id="useLegendRanges" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-200">
+                Use Legend Ranges
+              </label>
+            </div>
+            <div class="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs mt-2">
+                <div>
+                     <label class="block font-medium text-gray-600 mb-1">X Range</label>
+                     <input id="xMin" placeholder="Min" class="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm"/>
+                     <input id="xMax" placeholder="Max" class="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm mt-1"/>
+                 </div>
+                 <div>
+                     <label class="block font-medium text-gray-600 mb-1">Left Y Range</label>
+                     <input id="yMin" placeholder="Min" class="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm"/>
+                     <input id="yMax" placeholder="Max" class="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm mt-1"/>
+                 </div>
+                 <div>
+                     <label class="block font-medium text-gray-600 mb-1">Right Y Range</label>
+                     <input id="y2Min" placeholder="Min" class="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm"/>
+                     <input id="y2Max" placeholder="Max" class="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm mt-1"/>
+                 </div>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 justify-end mt-4">
+            <button id="btnClearCustom" class="bg-red-500 text-white text-xs font-medium py-1.5 px-3 rounded-md hover:bg-red-600">Clear Plot</button>
+            <button id="btnExportCustomHTML" class="bg-gray-600 text-white text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-700">Export HTML</button>
+            <button id="btnRenderCustom" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-blue-700 text-sm">Render Custom Plot</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Assistant Box (Full Width) -->
+    <div class="bg-white p-6 rounded-lg shadow-md space-y-4" id="aiAssistantBox">
+      <h2 class="text-lg font-semibold border-b pb-2 mb-4">🤖 AI Assistant</h2>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+        <div class="md:col-span-1 space-y-1">
+          <label for="apiKey" class="block text-sm font-medium text-gray-700">API Key</label>
+          <input type="password" id="apiKey" placeholder="sk-... / API_KEY" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm" />
+          <label for="aiProvider" class="block text-sm font-medium text-gray-700 mt-2">AI Provider</label>
+          <select id="aiProvider" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm">
+            <option value="openai" selected>OpenAI (GPT-4o)</option>
+            <option value="gemini">Google Gemini (1.5 Flash)</option>
+            <option value="custom">Custom (OpenAI-compatible)</option>
+          </select>
+          <div id="customApiBox" class="hidden mt-2">
+            <label for="apiUrl" class="block text-sm font-medium text-gray-700">Base URL</label>
+            <input type="text" id="apiUrl" placeholder="https://api.yourproxy.com/v1" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm" />
+          </div>
+          <button id="btnSaveApiKey" class="w-full mt-2 bg-gray-600 text-white text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-700">Save Config</button>
+        </div>
+        <div class="md:col-span-3 space-y-2">
+          <div>
+            <label for="aiQuerySelect" class="block text-sm font-medium text-gray-700">Pre-defined Queries</label>
+            <select id="aiQuerySelect" class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm text-sm">
+              <option value="summary">Analyze overall process stability.</option>
+              <option value="instability">Identify the top 3 most unstable variables.</option>
+              <option value="correlations">Analyze the strongest correlations.</option>
+              <option value="rootcause">What are potential root causes for current trends?</option>
+            </select>
+          </div>
+          <div>
+            <label for="aiCustomQuery" class="block text-sm font-medium text-gray-700">Or, ask for analysis:</label>
+            <textarea id="aiCustomQuery" rows="2" placeholder="e.g., 'What are the main trends?'" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 justify-end mt-4">
+        <div id="aiStatus" class="text-sm text-gray-600 mr-auto">Status: Ready</div>
+        <button id="btnGenerateAI" class="w-1/3 bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150">Generate</button>
+      </div>
+      <div class="mt-4 border-t pt-4">
+        <h3 class="text-md font-semibold text-gray-800 mb-2">AI Response:</h3>
+        <div id="aiResponseOutput" class="p-4 bg-gray-50 border rounded-md min-h-[100px] text-sm whitespace-pre-wrap font-mono">...</div>
+      </div>
+    </div>
+
+    <!-- Main Analysis Panel -->
+    <div class="bg-white p-6 rounded-lg shadow-md" id="mainPanel">
+      <div class="flex flex-wrap gap-4 items-center mb-6 border-b pb-4">
+        <label class="flex items-center gap-2">
+            <span class="text-sm font-medium text-gray-700">Variable:</span>
+            <select id="varSelect" class="w-64 px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"></select>
+        </label>
+        <label class="flex items-center gap-2">
+            <span class="text-sm font-medium text-gray-700">Rolling window:</span>
+            <input id="rollWindow" type="number" value="5" min="1" class="w-20 px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"/>
+        </label>
+        <div class="flex items-center gap-4 ml-auto text-sm">
+          <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="showStable" checked class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"/>
+              Show Stable (Q1–Q3)
+          </label>
+          <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="showOpt" checked class="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50"/>
+              Show Opt (median ±0.5 IQR)
+          </label>
+           <button id="btnComputeRanges" class="bg-gray-200 text-gray-700 text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-300">Recompute Ranges</button>
+        </div>
+      </div>
+
+      <div id="plots" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div id="ts" class="plot-box bg-gray-50 rounded-md border p-2"></div>
+        <div id="hist" class="plot-box bg-gray-50 rounded-md border p-2"></div>
+        <div id="customPlot" class="plot-box lg:col-span-2 bg-gray-50 rounded-md border p-2"></div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-6">
+        <div id="heatmap" class="min-h-[400px] lg:min-h-[600px] bg-gray-50 rounded-md border p-2"></div>
+        <div>
+          <h3 class="text-lg font-semibold mb-3">Top 5 Strongest Correlations</h3>
+          <div id="top5" class="text-sm overflow-x-auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Individual Plots Grid -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+      <h3 class="text-lg font-semibold mb-2">Individual Variable Plots</h3>
+      <div id="individualGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"></div>
+    </div>
+
+    <!-- Ranges Summary -->
+    <div class="bg-white p-6 rounded-lg shadow-md" id="rangesPanel">
+      <h3 class="text-lg font-semibold mb-4">Ranges & Stability Summary</h3>
+      <div id="rangesSummary" class="text-sm overflow-x-auto">(Computed after processing data)</div>
+    </div>
+  </div>
+
+  <script>
+    const API = "http://localhost:8000";
+    let columns = [];
+    let legend = {};
+    let currentData = null; // Store the latest processed data records/series
+
+    function updateStatus(msg) { document.getElementById('status').innerText = "Status: " + msg; }
+    function el(id) { return document.getElementById(id); }
+
+    /* ============================
+       Plotly Helpers (from UltimateEDA)
+       ============================ */
+    function getPlotConfig(opts = {}) {
+      const fullscreenIcon = { width: 1024, height: 1024, path: 'M64,384 L64,64 L384,64 M640,960 L960,960 L960,640 M64,640 L384,640 L384,960 M640,64 L960,64 L960,384' };
+      const cameraIcon = Plotly.Icons.camera || { width: 1024, height: 1024, path: 'M128,256 L896,256 L896,768 L128,768 Z M256,512 A256,256 0 1,0 768,512 A256,256 0 1,0 256,512 Z' };
+      const htmlIcon = { width: 1024, height: 1024, path: 'M256,128 L768,128 L768,896 L256,896 Z M384,320 L640,320 M384,512 L640,512 M384,704 L512,704' }; // Simple document icon
+      const linesIcon = { width: 1024, height: 1024, path: 'M64,768 L256,640 L448,704 L640,512 L832,576 L960,448' };
+      const pointsIcon = { width: 1024, height: 1024, path: 'M256,768 A32,32 0 1,0 256,704 A32,32 0 1,0 256,768 Z M448,704 A32,32 0 1,0 448,640 A32,32 0 1,0 448,704 Z M640,512 A32,32 0 1,0 640,448 A32,32 0 1,0 640,512 Z M832,576 A32,32 0 1,0 832,512 A32,32 0 1,0 832,576 Z' };
+      const barIcon = { width: 1024, height: 1024, path: 'M128,896 L256,896 L256,512 L128,512 Z M384,896 L512,896 L512,384 L384,384 Z M640,896 L768,896 L768,256 L640,256 Z' };
+      const cubeIcon = { width: 1024, height: 1024, path: 'M256,256 L768,256 L768,768 L256,768 Z M256,256 L512,128 L768,256 M256,768 L512,640 L768,768' };
+      
+      const config = {
+        responsive: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['toImage'],
+        modeBarButtonsToAdd: [
+          { name: 'Fullscreen', title: 'Toggle fullscreen', icon: fullscreenIcon, click: (gd) => togglePlotFullscreen(gd) },
+          { name: 'Save PNG (white bg)', title: 'Save PNG (white background)', icon: cameraIcon, click: (gd) => {
+            const title = (gd.layout && (gd.layout.title?.text || gd.layout.title)) || 'plot';
+            downloadImageWhite(gd, String(title).toLowerCase().replace(/\s+/g,'_') || 'plot');
+          }},
+          { name: 'Export HTML', title: 'Export as standalone HTML', icon: htmlIcon, click: (gd) => {
+            const title = (gd.layout && (gd.layout.title?.text || gd.layout.title)) || 'plot';
+            exportPlotHTML(gd, String(title).toLowerCase().replace(/\s+/g,'_') || 'plot');
+          }}
+        ]
+      };
+      
+      const types = opts.types || ['lines', 'points', 'bar'];
+      if (types.includes('lines')) config.modeBarButtonsToAdd.push({ name: 'Lines', title: 'Lines', icon: linesIcon, click: (gd) => changePlotType(gd, 'lines') });
+      if (types.includes('points')) config.modeBarButtonsToAdd.push({ name: 'Points', title: 'Scatter points', icon: pointsIcon, click: (gd) => changePlotType(gd, 'points') });
+      if (types.includes('bar')) config.modeBarButtonsToAdd.push({ name: 'Bar', title: 'Bar', icon: barIcon, click: (gd) => changePlotType(gd, 'bar') });
+      if (types.includes('3d')) config.modeBarButtonsToAdd.push({ name: '3D', title: 'Switch to 3D (requires z)', icon: cubeIcon, click: (gd) => changePlotType(gd, '3d') });
+      
+      return config;
+    }
+
+    function togglePlotFullscreen(gd) {
+      const el = gd;
+      const entering = !el.classList.contains('plot-fullscreen');
+      if (entering) {
+        el.__orig = { height: el.style.height, width: el.style.width, layout: JSON.parse(JSON.stringify(el.layout)) };
+        el.classList.add('plot-fullscreen');
+        document.body.classList.add('no-scroll');
+        el.style.height = '100vh'; el.style.width = '100vw';
+        Plotly.relayout(el, { showlegend: true, margin: { t: 60, b: 60, l: 70, r: 40 } }).then(() => Plotly.Plots.resize(el));
+      } else {
+        el.classList.remove('plot-fullscreen');
+        document.body.classList.remove('no-scroll');
+        if (el.__orig) {
+          el.style.height = el.__orig.height; el.style.width = el.__orig.width;
+          Plotly.relayout(el, el.__orig.layout).then(() => Plotly.Plots.resize(el));
+        } else { Plotly.Plots.resize(el); }
+      }
+    }
+
+    function downloadImageWhite(gd, filenameBase='plot') {
+      const origPaper = gd.layout.paper_bgcolor; const origPlot = gd.layout.plot_bgcolor;
+      Plotly.relayout(gd, { paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff' }).then(() => {
+        return Plotly.downloadImage(gd, {format:'png', filename: filenameBase, width: gd.clientWidth, height: gd.clientHeight, scale: 2});
+      }).then(() => {
+        Plotly.relayout(gd, { paper_bgcolor: origPaper, plot_bgcolor: origPlot });
+      });
+    }
+
+    function exportPlotHTML(gd, filenameBase='plot') {
+      const dataStr = JSON.stringify(gd.data);
+      const layoutStr = JSON.stringify(gd.layout);
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plotly Export</title><script src="https://cdn.plot.ly/plotly-2.24.1.min.js"><\/script></head><body><div id="p" style="width:100vw;height:100vh;"></div><script>Plotly.newPlot('p', ${dataStr}, ${layoutStr}, {responsive:true});<\/script></body></html>`;
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filenameBase + '.html'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function changePlotType(gd, targetType) {
+      const data = gd.data || [];
+      if (targetType === 'lines') Plotly.restyle(gd, { mode: data.map(()=>'lines'), type: data.map(()=>'scatter') });
+      else if (targetType === 'points') Plotly.restyle(gd, { mode: data.map(()=>'markers'), type: data.map(()=>'scatter') });
+      else if (targetType === 'bar') Plotly.restyle(gd, { type: data.map(()=>'bar'), mode: data.map(()=>null) });
+    }
+
+    function getLegendBounds(varName) {
+      if (!legend || !varName || !legend[varName]) return { hasMin: false, hasMax: false };
+      const entry = legend[varName];
+      const minVal = parseFloat(String(entry['Scale min'] || '').replace(',', '.'));
+      const maxVal = parseFloat(String(entry['Scale max'] || '').replace(',', '.'));
+      return { hasMin: !isNaN(minVal), hasMax: !isNaN(maxVal), min: minVal, max: maxVal };
+    }
+
+    /* ============================
+       Analysis Panel Logic
+       ============================ */
+    async function updateMainPlots() {
+      const col = el('varSelect').value;
+      if (!col) return;
+      
+      updateStatus(`Loading ${col}...`);
+      const fd = new FormData(); fd.append('x_var', 'timestamp'); fd.append('y_vars', col);
+      
+      try {
+        const res = await fetch(`${API}/plot-data`, { method: 'POST', body: fd });
+        const json = await res.json(); const data = json.data;
+        const x = data.timestamp; const y = data[col];
+        
+        // Rolling Mean
+        const w = parseInt(el('rollWindow').value) || 1;
+        const yRoll = w > 1 ? rollingMean(y, w) : null;
+        
+        // Get Stats for Bands
+        const statsRes = await fetch(`${API}/stats?variable=${col}`);
+        const statsData = await statsRes.json();
+        const s = statsData.stats[0];
+        
+        const traces = [];
+        // 1. Raw Data
+        traces.push({ x, y, name: 'Raw', type: 'scatter', mode: 'lines', line: { color: 'rgba(59, 130, 246, 0.4)', width: 1 } });
+        // 2. Rolling
+        if (yRoll) traces.push({ x, y: yRoll, name: `Rolling (${w})`, type: 'scatter', mode: 'lines', line: { color: 'rgb(59, 130, 246)', width: 2 } });
+        
+        const shapes = [];
+        // 3. Stable Band (Q1-Q3)
+        if (el('showStable').checked && s?.q1 !== undefined) {
+           shapes.push({ type: 'rect', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: s.q1, y1: s.q3, fillcolor: 'rgba(100, 100, 100, 0.1)', line: { width: 0 }, layer: 'below' });
+        }
+        // 4. Opt Band (Median +- 0.5 IQR)
+        if (el('showOpt').checked && s?.median !== undefined) {
+           const iqr = (s.q3 - s.q1);
+           shapes.push({ type: 'rect', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: s.median - 0.5*iqr, y1: s.median + 0.5*iqr, fillcolor: 'rgba(34, 197, 94, 0.15)', line: { width: 0 }, layer: 'below' });
+        }
+        
+        const layoutTs = { title: `${col} Time-series`, xaxis: { title: 'Time' }, yaxis: { title: col }, shapes };
+        const bounds = getLegendBounds(col);
+        if (bounds.hasMin && bounds.hasMax) layoutTs.yaxis.range = [bounds.min, bounds.max];
+        
+        Plotly.newPlot('ts', traces, layoutTs, getPlotConfig());
+        
+        // Histogram
+        const traceHist = { x: y, type: 'histogram', marker: { color: 'rgb(59, 130, 246)' } };
+        Plotly.newPlot('hist', [traceHist], { title: `${col} Distribution`, xaxis: { title: col } }, getPlotConfig());
+        
+        updateStatus("Ready");
+      } catch (e) {
+        console.error(e); updateStatus("Plot Error");
+      }
+    }
+
+    el('varSelect').addEventListener('change', updateMainPlots);
+    el('rollWindow').addEventListener('change', updateMainPlots);
+    el('showStable').addEventListener('change', updateMainPlots);
+    el('showOpt').addEventListener('change', updateMainPlots);
+    el('btnComputeRanges').addEventListener('click', fetchStats);
+
+    /* ============================
+       Math Helpers
+       ============================ */
+    function rollingMean(arr, window) {
+      const out = new Array(arr.length).fill(NaN);
+      const w = Math.max(1, window | 0);
+      for (let i = 0; i < arr.length; i++) {
+        const slice = arr.slice(Math.max(0, i - w + 1), i + 1).filter(v => typeof v === 'number' && !isNaN(v));
+        if (slice.length > 0) out[i] = slice.reduce((a, b) => a + b, 0) / slice.length;
+      }
+      return out;
+    }
+
+    // Derived Vars Logic
+    const DerivedVars = {
+      save: (name, formula, unit, min, max) => {
+        const list = DerivedVars.getAll();
+        list.push({ name, formula, unit, min, max, active: true });
+        localStorage.setItem('kiln_derived', JSON.stringify(list));
+        DerivedVars.render();
+      },
+      getAll: () => JSON.parse(localStorage.getItem('kiln_derived') || "[]"),
+      render: () => {
+        const list = DerivedVars.getAll();
+        const container = el('derivedList');
+        container.innerHTML = '';
+        list.forEach((item, idx) => {
+          const div = document.createElement('div');
+          div.className = "flex justify-between items-center text-xs bg-gray-50 p-2 rounded border mb-1";
+          div.innerHTML = `<div><strong>${item.name}</strong> = ${item.formula} <span class="text-gray-400">(${item.unit || '-'})</span></div>`;
+          const btnRemove = document.createElement('button');
+          btnRemove.innerText = "Remove"; btnRemove.className = "text-red-500 hover:text-red-700 ml-2";
+          btnRemove.onclick = () => {
+            list.splice(idx, 1);
+            localStorage.setItem('kiln_derived', JSON.stringify(list));
+            DerivedVars.render();
+          };
+          div.appendChild(btnRemove);
+          container.appendChild(div);
+        });
+      },
+      restore: async () => {
+        const list = DerivedVars.getAll();
+        for (const item of list) {
+          if (!item.active) continue;
+          const fd = new FormData();
+          fd.append('name', item.name); fd.append('formula', item.formula);
+          if (item.unit) fd.append('unit', item.unit);
+          if (item.min) fd.append('min_val', item.min);
+          if (item.max) fd.append('max_val', item.max);
+          try { await fetch(`${API}/add-derived`, { method: 'POST', body: fd }); } catch (e) {}
+        }
+        return true;
+      }
+    };
+
+    // Initial Render
+    DerivedVars.render();
+
+    // AI Config
+    function saveAIConfig() {
+      localStorage.setItem('kiln_ai_key', el('apiKey').value);
+      localStorage.setItem('kiln_ai_provider', el('aiProvider').value);
+      localStorage.setItem('kiln_ai_url', el('apiUrl').value);
+      alert("AI Config saved!");
+    }
+    el('btnSaveApiKey').addEventListener('click', saveAIConfig);
+    el('apiKey').value = localStorage.getItem('kiln_ai_key') || '';
+    el('aiProvider').value = localStorage.getItem('kiln_ai_provider') || 'openai';
+    el('apiUrl').value = localStorage.getItem('kiln_ai_url') || '';
+
+    function toggleCustomApi() {
+      if (el('aiProvider').value === 'custom') {
+        el('customApiBox').classList.remove('hidden');
+      } else {
+        el('customApiBox').classList.add('hidden');
+      }
+    }
+    el('aiProvider').addEventListener('change', toggleCustomApi);
+    toggleCustomApi();
+
+    // Add Extra Dataset
+    el('btnAddDataset').addEventListener('click', async () => {
+      const files = el('fileDataExtra').files;
+      if (!files.length) return alert("Select file(s)");
+
+      updateStatus("Adding extra data...");
+      const fd = new FormData();
+      for (const f of files) fd.append('files', f);
+      fd.append('method', el('extraInterpMethod').value);
+      fd.append('gap_limit', el('extraGapLimitMin').value || '');
+
+      try {
+        const res = await fetch(`${API}/add-dataset`, { method: 'POST', body: fd });
+        if (!res.ok) throw new Error("Add failed");
+        const json = await res.json();
+        columns = json.columns;
+        populateSelectors();
+        updateStatus("Dataset added and aligned.");
+      } catch (e) { alert(e.message); }
+    });
+
+    // Suffix Helper
+    el('fileDataExtra').onchange = () => {
+       const files = el('fileDataExtra').files;
+       const list = el('extraSuffixList'); list.innerHTML = '';
+       Array.from(files).forEach((f, i) => {
+          const div = document.createElement('div');
+          div.className = "flex items-center gap-1";
+          div.innerHTML = `<span class="truncate w-24" title="${f.name}">${f.name}</span>: <input data-idx="${i}" class="suffix-input w-16 px-1 border rounded" placeholder="__f${i+1}">`;
+          list.appendChild(div);
+       });
+    };
+
+    el('applySuffixPreset').onclick = () => {
+       const preset = el('suffixPreset').value;
+       const inputs = document.querySelectorAll('.suffix-input');
+       inputs.forEach((inp, i) => {
+          if (preset === 'inout') inp.value = (i === 0 ? '__in' : '__out');
+          else if (preset === 'enumerate') inp.value = `__f${i+1}`;
+          else inp.value = '';
+       });
+    };
+
+    // Derived Vars Add/Test
+    el('btnAddDerived').onclick = async () => {
+       const name = el('derivedName').value; const expr = el('derivedExpr').value;
+       if (!name || !expr) return alert("Name and expression required");
+       const fd = new FormData(); fd.append('name', name); fd.append('formula', expr);
+       fd.append('unit', el('derivedUnit').value); fd.append('min_val', el('derivedMin').value); fd.append('max_val', el('derivedMax').value);
+       
+       try {
+          const res = await fetch(`${API}/add-derived`, { method: 'POST', body: fd });
+          if (!res.ok) throw new Error(await res.text());
+          const json = await res.json();
+          columns = json.columns;
+          DerivedVars.save(name, expr, el('derivedUnit').value, el('derivedMin').value, el('derivedMax').value);
+          populateSelectors();
+          alert("Added derived variable: " + name);
+       } catch (e) { alert("Error: " + e.message); }
+    };
+
+    el('btnTestDerived').onclick = async () => {
+       const expr = el('derivedExpr').value; if (!expr) return;
+       const fd = new FormData(); fd.append('name', 'test'); fd.append('formula', expr);
+       try {
+          const res = await fetch(`${API}/add-derived`, { method: 'POST', body: fd });
+          if (res.ok) el('derivedMsg').innerText = "✅ Formula is valid!";
+          else el('derivedMsg').innerText = "❌ Error: " + (await res.text());
+       } catch (e) { el('derivedMsg').innerText = "❌ Error: " + e.message; }
+    };
+
+    // Custom Plot Helpers
+    el('btnSelectAllY').onclick = () => {
+       const opts = el('ySelect').options;
+       const allSelected = Array.from(opts).every(o => o.selected);
+       Array.from(opts).forEach(o => o.selected = !allSelected);
+    };
+    el('btnClearCustom').onclick = () => Plotly.purge('customPlot');
+    el('btnExportCustomHTML').onclick = () => exportPlotHTML(el('customPlot'), 'custom_plot');
+
+    /* ============================
+       Core Event Listeners
+       ============================ */
+    // Upload & Process
+    el('btnMergeAndProcess').addEventListener('click', async () => {
+      const dFiles = el('fileData').files;
+      const lFile = el('fileLegend').files[0];
+      if (!dFiles.length) return alert("Select data files");
+
+      updateStatus("Uploading...");
+      const fd = new FormData();
+      for (const f of dFiles) fd.append('files', f);
+
+      try {
+        await fetch(`${API}/upload`, { method: 'POST', body: fd });
+        if (lFile) {
+          const fd2 = new FormData(); fd2.append('file', lFile);
+          await fetch(`${API}/upload-legend`, { method: 'POST', body: fd2 });
+        }
+
+        updateStatus("Processing...");
+        const minNZ = el('minNonZero').value;
+        const form = new FormData();
+        form.append('min_nonzero', minNZ);
+        form.append('merge_strategy', 'linear');
+
+        const res = await fetch(`${API}/process`, { method: 'POST', body: form });
+        if (!res.ok) throw new Error("Process failed");
+        const data = await res.json();
+        columns = data.columns;
+        updateStatus(`Processed ${data.rows} rows.`);
+
+        const legRes = await fetch(`${API}/legend`);
+        const legJson = await legRes.json();
+        legend = legJson.legend || {};
+
+        populateSelectors();
+        el('btnDownloadCorr').disabled = false;
+        el('btnRenderAll').disabled = false;
+        el('btnOpenOptimizer').disabled = false;
+
+        fetchStats();
+      } catch (e) {
+        console.error(e); alert("Error: " + e.message);
+      }
+    });
+
+    function populateSelectors() {
+      const xSel = el('xSelect'); const ySel = el('ySelect');
+      const varSel = el('varSelect'); const rightSel = el('rightAxisSelect');
+      
+      [xSel, ySel, varSel, rightSel].forEach(s => s.innerHTML = "");
+      
+      const noneOpt = document.createElement('option'); noneOpt.value = ""; noneOpt.innerText = "(none)";
+      rightSel.appendChild(noneOpt);
+
+      columns.forEach(c => {
+        const label = legend[c] && legend[c].Unit ? `${c} (${legend[c].Unit})` : c;
+        const opt = () => { const o = document.createElement('option'); o.value = c; o.innerText = label; return o; };
+        
+        xSel.appendChild(opt());
+        if (c !== 'timestamp') {
+          ySel.appendChild(opt());
+          varSel.appendChild(opt());
+          rightSel.appendChild(opt());
+        }
+      });
+      if (columns.includes('timestamp')) xSel.value = 'timestamp';
+    }
+
+    // Individual Grid
+    el('btnRenderAll').addEventListener('click', async () => {
+      if (!confirm("This will fetch plots for " + (columns.length - 1) + " variables. Continue?")) return;
+      el('individualGrid').innerHTML = "";
+      for (const col of columns) {
+        if (col === 'timestamp') continue;
+        const div = document.createElement('div');
+        div.className = "bg-white border rounded shadow-sm overflow-hidden";
+        div.innerHTML = `<div class="bg-gray-50 px-2 py-1 text-xs font-bold border-b truncate">${col}</div><div id="p_${col}" class="h-32 w-full"></div>`;
+        el('individualGrid').appendChild(div);
+        
+        const fd = new FormData(); fd.append('x_var', 'timestamp'); fd.append('y_vars', col); fd.append('max_points', 500);
+        fetch(`${API}/plot-data`, { method: 'POST', body: fd }).then(r => r.json()).then(json => {
+          const d = json.data;
+          const trace = { x: d.timestamp, y: d[col], type: 'scatter', mode: 'lines', line: { width: 1 } };
+          const layout = { margin: { t: 5, b: 5, l: 5, r: 5 }, xaxis: { visible: false }, yaxis: { visible: false } };
+          const bounds = getLegendBounds(col);
+          if (bounds.hasMin && bounds.hasMax) layout.yaxis.range = [bounds.min, bounds.max];
+          Plotly.newPlot(`p_${col}`, [trace], layout, getPlotConfig({types:['lines', 'points']}));
+        });
+      }
+    });
+
+    // Custom Plot (simplified multi-Y/Scatter)
+    el('btnRenderCustom').addEventListener('click', async () => {
+      const type = el('plotType').value; const x = el('xSelect').value;
+      const ys = Array.from(el('ySelect').selectedOptions).map(o => o.value);
+      if (!ys.length) return alert("Select Y variables");
+      
+      const fd = new FormData(); fd.append('x_var', x); ys.forEach(y => fd.append('y_vars', y));
+      try {
+        const res = await fetch(`${API}/plot-data`, { method: 'POST', body: fd });
+        const json = await res.json(); const data = json.data;
+        const traces = [];
+        if (type === 'parallel') {
+          const dims = ys.map(y => {
+            const b = getLegendBounds(y);
+            return { label: y, values: data[y], range: b.hasMin && b.hasMax ? [b.min, b.max] : undefined };
+          });
+          traces.push({ type: 'parcoords', dimensions: dims, line: { color: data[ys[0]], colorscale: 'Viridis', showscale: true } });
+        } else {
+          ys.forEach(y => {
+            traces.push({ x: data[x], y: data[y], mode: type === 'scatter' ? 'markers' : 'lines', name: y, type: 'scatter' });
+          });
+        }
+        const layout = { title: 'Custom Plot', xaxis: { title: x } };
+        Plotly.newPlot('customPlot', traces, layout, getPlotConfig());
+      } catch (e) { console.error(e); }
+    });
+
+    // Stats
+    async function fetchStats() {
+      const sRes = await fetch(`${API}/stats`); const sData = await sRes.json();
+      let html = '<table class="w-full text-xs text-left border"><thead class="bg-gray-100"><tr><th>Var</th><th>Min</th><th>Max</th><th>Mean</th><th>Std</th></tr></thead><tbody>';
+      sData.stats.forEach(s => {
+        html += `<tr><td class="p-1 border">${s.variable}</td><td class="p-1 border">${s.min?.toFixed(2)}</td><td class="p-1 border">${s.max?.toFixed(2)}</td><td class="p-1 border">${s.mean?.toFixed(2)}</td><td class="p-1 border">${s.std?.toFixed(2)}</td></tr>`;
+      });
+      html += '</tbody></table>'; el('rangesSummary').innerHTML = html;
+      
+      const hRes = await fetch(`${API}/heatmap`); const hData = await hRes.json();
+      Plotly.newPlot('heatmap', [{ z: hData.z, x: hData.x, y: hData.y, type: 'heatmap', colorscale: 'RdBu', zmin: -1, zmax: 1 }], { title: 'Correlation Matrix' });
+      if (hData.pairs) {
+        const list = hData.pairs.slice(0, 5).map(p => `<li>${p.var1} - ${p.var2}: ${p.value.toFixed(2)}</li>`).join('');
+        el('top5').innerHTML = `<ul class="list-disc pl-5">${list}</ul>`;
+      }
+    }
+
+    // AI Query
+    el('btnGenerateAI').addEventListener('click', async () => {
+      const query = el('aiCustomQuery').value || el('aiQuerySelect').value;
+      const key = el('apiKey').value; const provider = el('aiProvider').value;
+      
+      if (provider === 'openai' && !key) return alert("API Key required for OpenAI");
+
+      el('aiStatus').innerText = "Status: Thinking...";
+      el('aiResponseOutput').innerText = "Generating analysis based on current stats...";
+      el('btnGenerateAI').disabled = true;
+
+      const fd = new FormData(); 
+      fd.append('query', query); 
+      fd.append('api_key', key); 
+      fd.append('provider', provider);
+      if (provider === 'custom') {
+        fd.append('base_url', el('apiUrl').value);
+      }
+      
+      try {
+        // Context (last 50 stats)
+        const sRes = await fetch(`${API}/stats`); 
+        if (!sRes.ok) {
+          const err = await sRes.json();
+          throw new Error(`Stats failed: ${err.message || sRes.statusText}`);
+        }
+        const sData = await sRes.json();
+        const stats = sData.stats || [];
+        fd.append('context', JSON.stringify(stats.slice(0, 50)));
+
+        const res = await fetch(`${API}/ai-query`, { method: 'POST', body: fd });
+        const json = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(json.message || `Server error ${res.status}`);
+        }
+        
+        el('aiResponseOutput').innerText = json.choices[0].message.content;
+        el('aiStatus').innerText = "Status: Ready";
+      } catch (e) { 
+        console.error(e);
+        el('aiResponseOutput').innerText = "❌ Analysis Failed:\n" + e.message; 
+        el('aiStatus').innerText = "Status: Error";
+      } finally {
+        el('btnGenerateAI').disabled = false;
+      }
+    });
+
+    // Sessions & Export
+    el('btnExportCSV').onclick = () => window.location.href = `${API}/export-data?format=csv`;
+    el('btnExportXLSX').onclick = () => window.location.href = `${API}/export-data?format=xlsx`;
+    el('btnSaveSession').onclick = () => {
+      const blob = new Blob([JSON.stringify({ derived: DerivedVars.getAll(), legend, ts: new Date().toISOString() })], { type: 'application/json' });
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'session.json'; a.click();
+    };
+    el('btnLoadSessionTrigger').onclick = () => el('fileLoadSession').click();
+    el('fileLoadSession').onchange = (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const r = new FileReader(); r.onload = async (ev) => {
+        const s = JSON.parse(ev.target.result);
+        if (s.derived) { localStorage.setItem('kiln_derived', JSON.stringify(s.derived)); await DerivedVars.restore(); alert("Session loaded."); }
+      };
+      r.readAsText(f);
+    };
+
+  </script>
+</body>
+
+</html>

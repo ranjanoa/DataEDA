@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles from index.html */
+input[type="file"]::file-selector-button {
+  @apply px-3 py-1.5 mr-4 bg-gray-100 text-gray-700 font-semibold border border-gray-300 rounded-md shadow-sm cursor-pointer hover:bg-gray-200 text-sm;
+}
+
+.plot-box {
+  min-height: 360px;
+  position: relative;
+}
+
+.plot-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  background: #fff;
+  padding: 8px;
+}
+
+body.no-scroll {
+  overflow: hidden;
+}
