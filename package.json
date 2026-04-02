@@ -6,6 +6,7 @@
   "scripts": {
     "build:css": "tailwindcss -i ./frontend/static/css/input.css -o ./frontend/static/css/output.css",
     "watch:css": "tailwindcss -i ./frontend/static/css/input.css -o ./frontend/static/css/output.css --watch",
+    "build": "npm run build:tailwind",
     "build:tailwind": "tailwindcss -i ./frontend/static/css/input.css -o ./frontend/static/css/output.css",
     "postinstall": "npm run build:tailwind"
   },
