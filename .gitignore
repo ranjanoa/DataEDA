@@ -38,6 +38,4 @@ yarn-error.log*
 *.swo
 
 # Project specific
-frontend/static/css/output.css
-# But we might want to include the output.css if we don't build it in the action?
-# Better to build it in the action.
+# frontend/static/css/output.css is committed so Docker doesn't need Node.js
