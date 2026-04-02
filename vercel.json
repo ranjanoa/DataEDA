@@ -3,7 +3,8 @@
   "outputDirectory": ".",
   "functions": {
     "api/index.py": {
-      "includeFiles": "frontend/**"
+      "includeFiles": "frontend/**",
+      "excludeFiles": "{.venv,node_modules,backend}/**"
     }
   },
   "rewrites": [

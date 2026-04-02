@@ -1,0 +1,10 @@
+.venv
+node_modules
+backend
+.idea
+.git
+.github
+*.pyc
+__pycache__
+ultimateEDA ANALYSIS.html
+walkthroughfilter.md
