@@ -689,14 +689,7 @@
 
       updateStatus("Uploading...");
       const fd = new FormData();
-      let totalSize = 0;
-      for (const f of dFiles) { fd.append('files', f); totalSize += f.size; }
-
-      const MAX_SIZE = 4 * 1024 * 1024; // 4MB to stay under Vercel's 4.5MB limit
-      if (totalSize > MAX_SIZE) {
-        updateStatus(`⚠️ File(s) too large (${(totalSize / 1024 / 1024).toFixed(1)}MB). Vercel limits uploads to 4MB. Run locally for large files.`);
-        return;
-      }
+      for (const f of dFiles) { fd.append('files', f); }
 
       try {
         await fetch(`${API}/upload`, { method: 'POST', body: fd });
