@@ -291,18 +291,28 @@ def calculate_stats(df: pd.DataFrame) -> list[dict]:
         desc = series.describe()
         q1 = desc['25%']
         q3 = desc['75%']
-        # iqr = q3 - q1
+        n = count_non_nan(series)
+        iqr = q3 - q1
+        median = desc['50%']
+        opt_low = median - 0.5 * iqr
+        opt_high = median + 0.5 * iqr
         
         stats.append({
             'variable': col,
             'min': to_native(desc['min']),
             'max': to_native(desc['max']),
             'mean': to_native(desc['mean']),
-            'median': to_native(desc['50%']),
+            'median': to_native(median),
             'q1': to_native(q1),
             'q3': to_native(q3),
+            'opt_low': to_native(opt_low),
+            'opt_high': to_native(opt_high),
             'std': to_native(desc['std']),
-            'count': int(count_non_nan(series))
+            'count': int(n),
+            'pct_below_stable': to_native((series < q1).sum() / n * 100) if n > 0 else 0,
+            'pct_above_stable': to_native((series > q3).sum() / n * 100) if n > 0 else 0,
+            'pct_below_opt': to_native((series < opt_low).sum() / n * 100) if n > 0 else 0,
+            'pct_above_opt': to_native((series > opt_high).sum() / n * 100) if n > 0 else 0
         })
         
     return stats
