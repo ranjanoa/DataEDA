@@ -102,6 +102,9 @@
             <button id="btnExportXLSX"
               class="bg-indigo-500 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-indigo-600 text-center">Export
               Excel</button>
+            <button id="btnGenerateReport"
+              class="col-span-2 bg-blue-700 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-blue-800 text-center">Generate
+              Analysis Report</button>
           </div>
           <div class="flex gap-2">
             <button id="btnSaveSession"
@@ -236,6 +239,36 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Global Insights Dashboard -->
+    <div id="insightDashboard" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Data Points</h3>
+        <p id="insightPoints" class="text-2xl font-bold text-gray-800 mt-1">0</p>
+        <p class="text-xs text-gray-500 mt-1">Samples analyzed</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-indigo-500">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Duration</h3>
+        <p id="insightDuration" class="text-lg font-bold text-gray-800 mt-1">0h 0m</p>
+        <p id="insightTimeRange" class="text-xs text-gray-500 mt-1">Start - End</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Avg. Frequency</h3>
+        <p id="insightFrequency" class="text-2xl font-bold text-gray-800 mt-1">0s</p>
+        <p class="text-xs text-gray-500 mt-1">Time between samples</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Shutdown Periods</h3>
+        <p id="insightShutdownCount" class="text-2xl font-bold text-gray-800 mt-1">0</p>
+        <p id="insightShutdownMsg" class="text-xs text-gray-500 mt-1">Detected gaps/zeros</p>
+      </div>
+    </div>
+
+    <!-- Shutdown Periods Detail (Conditional) -->
+    <div id="shutdownPanel" class="hidden bg-white p-6 rounded-lg shadow-md border-l-4 border-red-200">
+      <h3 class="text-md font-semibold text-gray-800 mb-2">Shutdown & Inactivity Detail</h3>
+      <div id="shutdownList" class="text-sm space-y-2 max-h-40 overflow-y-auto"></div>
     </div>
 
     <!-- AI Assistant Box (Full Width) -->
@@ -938,9 +971,38 @@
 
     // Stats
     async function fetchStats() {
-      const sRes = await fetch(`${API}/stats`); const sData = await sRes.json();
+      const sRes = await fetch(`${API}/stats`); 
+      const sData = await sRes.json();
+      
+      // Update Global Dashboard
+      const dash = el('insightDashboard');
+      const sum = sData.summary || {};
+      if (sum.data_points) {
+        dash.classList.remove('hidden');
+        el('insightPoints').innerText = sum.data_points.toLocaleString();
+        el('insightDuration').innerText = sum.duration_str.split('.')[0]; // trim microseconds
+        el('insightTimeRange').innerText = `${sum.start_time.split('.')[0]} TO ${sum.end_time.split('.')[0]}`;
+        el('insightFrequency').innerText = `${sum.avg_sampling_seconds.toFixed(1)}s`;
+        
+        const sh = sData.shutdowns || [];
+        el('insightShutdownCount').innerText = sh.length;
+        if (sh.length > 0) {
+          el('shutdownPanel').classList.remove('hidden');
+          el('shutdownList').innerHTML = sh.map(s => `
+            <div class="flex justify-between items-center p-2 bg-red-50 rounded border border-red-100">
+              <span class="font-bold text-red-700">${s.type}</span>
+              <span class="text-gray-600">${s.start.split('.')[0]} ➔ ${s.end.split('.')[0]}</span>
+              <span class="bg-red-100 px-2 py-0.5 rounded text-xs text-red-800">${s.duration.split('.')[0]}</span>
+            </div>
+          `).join('');
+        } else {
+          el('shutdownPanel').classList.add('hidden');
+        }
+      }
+
       let html = '<table class="w-full text-xs text-left border"><thead class="bg-gray-100"><tr>' +
                  '<th>Var</th><th>Min</th><th>Max</th><th>Mean</th>' +
+                 '<th>Zeros (%)</th><th>Analytical (Skew/Kurt)</th>' +
                  '<th>Stable Range (Q1-Q3)</th><th>% Below/Above</th>' +
                  '<th>Optimum Range</th><th>% Below/Above</th>' +
                  '</tr></thead><tbody>';
@@ -950,13 +1012,18 @@
         const pctStable = `<span class="text-blue-600">${s.pct_below_stable?.toFixed(1)}%</span> / <span class="text-red-600">${s.pct_above_stable?.toFixed(1)}%</span>`;
         const pctOpt = `<span class="text-blue-700">${s.pct_below_opt?.toFixed(1)}%</span> / <span class="text-red-700">${s.pct_above_opt?.toFixed(1)}%</span>`;
         
+        const zerosInfo = `${s.zeros_count} (${s.zeros_pct?.toFixed(1)}%)`;
+        const analytical = `S:${s.skewness?.toFixed(2)} / K:${s.kurtosis?.toFixed(2)}`;
+
         html += `<tr>` +
                 `<td class="p-1 border font-bold">${s.variable}</td>` +
                 `<td class="p-1 border">${s.min?.toFixed(2)}</td>` +
                 `<td class="p-1 border">${s.max?.toFixed(2)}</td>` +
                 `<td class="p-1 border">${s.mean?.toFixed(2)}</td>` +
-                `<td class="p-1 border bg-gray-50">${stable}</td>` +
-                `<td class="p-1 border bg-gray-50 text-center">${pctStable}</td>` +
+                `<td class="p-1 border bg-blue-50">${zerosInfo}</td>` +
+                `<td class="p-1 border bg-gray-50">${analytical}</td>` +
+                `<td class="p-1 border">${stable}</td>` +
+                `<td class="p-1 border text-center">${pctStable}</td>` +
                 `<td class="p-1 border bg-green-50">${opt}</td>` +
                 `<td class="p-1 border bg-green-50 text-center">${pctOpt}</td>` +
                 `</tr>`;
@@ -1034,6 +1101,51 @@
         if (s.derived) { localStorage.setItem('kiln_derived', JSON.stringify(s.derived)); await DerivedVars.restore(); alert("Session loaded."); }
       };
       r.readAsText(f);
+    };
+
+    // Report Generation
+    el('btnGenerateReport').onclick = async () => {
+      updateStatus("Generating Report...");
+      
+      try {
+        const statsRes = await fetch(`${API}/stats`);
+        const statsData = await statsRes.json();
+        
+        const heatRes = await fetch(`${API}/heatmap`);
+        const heatData = await heatRes.json();
+        
+        const aiResponse = el('aiResponseOutput').innerText;
+        
+        const payload = {
+          title: "Process Stability Analysis Report",
+          dataset_name: el('fileData').files[0]?.name || "Uploaded Dataset",
+          summary: statsData.summary,
+          stats: statsData.stats,
+          shutdowns: statsData.shutdowns,
+          correlations: heatData.pairs || [],
+          ai_summary: aiResponse !== "..." && !aiResponse.includes("Generating") ? aiResponse : ""
+        };
+        
+        const res = await fetch(`${API}/generate-report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "Failed to generate report");
+        
+        // Open report in new tab
+        const win = window.open("", "_blank");
+        win.document.write(json.html);
+        win.document.close();
+        
+        updateStatus("Report Ready");
+      } catch (e) {
+        console.error(e);
+        alert("Report Error: " + e.message);
+        updateStatus("Error Generating Report");
+      }
     };
 
   </script>

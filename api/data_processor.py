@@ -297,6 +297,11 @@ def calculate_stats(df: pd.DataFrame) -> list[dict]:
         opt_low = median - 0.5 * iqr
         opt_high = median + 0.5 * iqr
         
+        # New insights
+        zeros = (series == 0).sum()
+        skew = series.skew()
+        kurt = series.kurt()
+        
         stats.append({
             'variable': col,
             'min': to_native(desc['min']),
@@ -309,6 +314,10 @@ def calculate_stats(df: pd.DataFrame) -> list[dict]:
             'opt_high': to_native(opt_high),
             'std': to_native(desc['std']),
             'count': int(n),
+            'zeros_count': int(zeros),
+            'zeros_pct': to_native(zeros / n * 100) if n > 0 else 0,
+            'skewness': to_native(skew),
+            'kurtosis': to_native(kurt),
             'pct_below_stable': to_native((series < q1).sum() / n * 100) if n > 0 else 0,
             'pct_above_stable': to_native((series > q3).sum() / n * 100) if n > 0 else 0,
             'pct_below_opt': to_native((series < opt_low).sum() / n * 100) if n > 0 else 0,
@@ -319,6 +328,106 @@ def calculate_stats(df: pd.DataFrame) -> list[dict]:
 
 def count_non_nan(series):
     return series.count()
+
+def get_global_summary(df: pd.DataFrame) -> dict:
+    """
+    Return global metrics for the dataset.
+    """
+    if df.empty:
+        return {}
+    
+    n_rows = len(df)
+    n_cols = len(df.columns)
+    
+    # Calculate duration
+    if 'timestamp' in df.columns:
+        start_ts = df['timestamp'].min()
+        end_ts = df['timestamp'].max()
+        duration = end_ts - start_ts
+        
+        # Calculate avg sampling rate
+        diffs = df['timestamp'].diff().dropna()
+        avg_gap = diffs.mean() if not diffs.empty else pd.Timedelta(0)
+        
+        return {
+            'data_points': n_rows,
+            'variables_count': n_cols - 1, # excluding timestamp
+            'start_time': str(start_ts),
+            'end_time': str(end_ts),
+            'duration_str': str(duration),
+            'duration_seconds': duration.total_seconds(),
+            'avg_sampling_seconds': avg_gap.total_seconds() if hasattr(avg_gap, 'total_seconds') else 0
+        }
+    
+    return {
+        'data_points': n_rows,
+        'variables_count': n_cols
+    }
+
+def find_shutdown_periods(df: pd.DataFrame) -> list[dict]:
+    """
+    Detect periods of inactivity or missing data.
+    Heuristic 1: Time gaps > 5 * median gap.
+    Heuristic 2: Long periods where key indicators (or all variables) are zero.
+    """
+    if df.empty or 'timestamp' not in df.columns:
+        return []
+        
+    shutdowns = []
+    ts = df['timestamp']
+    diffs = ts.diff().dropna()
+    
+    if diffs.empty:
+        return []
+        
+    median_gap = diffs.median()
+    threshold = median_gap * 5
+    
+    # Detect time gaps
+    for i in range(1, len(df)):
+        gap = ts.iloc[i] - ts.iloc[i-1]
+        if gap > threshold:
+            shutdowns.append({
+                'type': 'Time Gap',
+                'start': str(ts.iloc[i-1]),
+                'end': str(ts.iloc[i]),
+                'duration': str(gap),
+                'duration_seconds': gap.total_seconds()
+            })
+            
+    # Detect Zero-Value blocks
+    # Looking for blocks where > 80% of variables are zero for more than 5 consecutive rows
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        is_zero_row = (df[numeric_cols] == 0).sum(axis=1) / len(numeric_cols) > 0.8
+        
+        # Find consecutive blocks of True
+        is_zero_row = is_zero_row.astype(int)
+        # Using a simple differentiator to find transitions
+        changes = is_zero_row.diff().fillna(0)
+        starts = np.where(changes == 1)[0]
+        ends = np.where(changes == -1)[0]
+        
+        if is_zero_row.iloc[0] == 1:
+            starts = np.insert(starts, 0, 0)
+        if is_zero_row.iloc[-1] == 1:
+            ends = np.append(ends, len(is_zero_row)-1)
+            
+        for s, e in zip(starts, ends):
+            # Only count as shutdown if it lasts more than X rows (e.g. 5)
+            if (e - s) >= 5:
+                gap_time = ts.iloc[e] - ts.iloc[s]
+                shutdowns.append({
+                    'type': 'Process Inactive (Zeros)',
+                    'start': str(ts.iloc[s]),
+                    'end': str(ts.iloc[e]),
+                    'duration': str(gap_time),
+                    'duration_seconds': gap_time.total_seconds()
+                })
+                
+    # Sort by start time
+    shutdowns.sort(key=lambda x: x['start'])
+    return shutdowns
 
 def get_stability_bands(df: pd.DataFrame, var_name: str) -> dict:
     """

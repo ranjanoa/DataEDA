@@ -12,6 +12,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 import pandas as pd
 import numpy as np
 import io
@@ -33,10 +34,14 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from data_processor import (
     load_data, merge_datasets, calculate_stats, downsample_for_plot, 
     calculate_correlations, parse_legend, filter_columns, 
-    calculate_derived_var, get_stability_bands, process_extra_dataset
+    calculate_derived_var, get_stability_bands, process_extra_dataset,
+    get_global_summary, find_shutdown_periods
 )
 
 app = FastAPI()
+
+# Configure Templates
+templates = Jinja2Templates(directory=get_resource_path(os.path.join("frontend", "templates")))
 
 # Configure CORS
 app.add_middleware(
@@ -209,7 +214,13 @@ async def get_stats():
     
     try:
         stats = calculate_stats(current_df)
-        return {"stats": stats}
+        summary = get_global_summary(current_df)
+        shutdowns = find_shutdown_periods(current_df)
+        return {
+            "stats": stats, 
+            "summary": summary, 
+            "shutdowns": shutdowns
+        }
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
@@ -398,6 +409,39 @@ async def export_data(format: str = "csv"):
         else:
             return JSONResponse(status_code=400, content={"message": "Invalid format. Use csv or xlsx."})
     except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+@app.post("/generate-report")
+async def generate_report(
+    data: Dict = Body(...)
+):
+    """
+    Generate an HTML report using the provided analysis data.
+    """
+    import datetime
+    try:
+        # Prepare context for template
+        context = {
+            "title": data.get("title", "Process Analysis"),
+            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "dataset_name": data.get("dataset_name", "Uploaded Data"),
+            "summary": data.get("summary", {}),
+            "stats": data.get("stats", []),
+            "shutdowns": data.get("shutdowns", []),
+            "correlations": data.get("correlations", []),
+            "ai_summary": data.get("ai_summary", "")
+        }
+        
+        # We need to pass the request object to the template when using Jinja2Templates
+        # But here we might just want to return the raw HTML for the browser to open.
+        # However, FastAPI's TemplateResponse needs the request.
+        # Let's use a dummy request or just render manually if needed.
+        from starlette.requests import Request
+        # In a real route, the first arg is the request. We can adjust generate_report to take Request.
+        
+        return JSONResponse(content={"html": templates.get_template("report.html").render(context)})
+    except Exception as e:
+        logging.error(f"Report generation error: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 if __name__ == "__main__":
