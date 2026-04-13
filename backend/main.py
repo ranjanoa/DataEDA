@@ -8,10 +8,11 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 import pandas as pd
 import numpy as np
 import io
@@ -37,6 +38,9 @@ from data_processor import (
 )
 
 app = FastAPI()
+
+# Configure Templates
+templates = Jinja2Templates(directory=get_resource_path(os.path.join("frontend", "templates")))
 
 # Configure CORS
 app.add_middleware(
@@ -205,12 +209,37 @@ async def get_columns():
 async def get_stats():
     global current_df
     if current_df is None:
-        return JSONResponse(status_code=400, content={"message": "No data processed"})
-    
+        return JSONResponse(status_code=400, content={"message": "No data active"})
     try:
-        stats = calculate_stats(current_df)
-        return {"stats": stats}
+        stats_data = calculate_stats(current_df)
+        return stats_data
     except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+@app.post("/generate-report")
+async def generate_report(data: Dict = Body(...)):
+    """
+    Generate an HTML report using the provided analysis data.
+    """
+    import datetime
+    try:
+        # Prepare context for template
+        context = {
+            "title": data.get("title", "Process Analysis"),
+            "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "dataset_name": data.get("dataset_name", "Uploaded Data"),
+            "summary": data.get("summary", {}),
+            "stats": data.get("stats", []),
+            "shutdowns": data.get("shutdowns", []),
+            "correlations": data.get("correlations", []),
+            "ai_summary": data.get("ai_summary", "")
+        }
+        
+        # Render and return raw HTML in JSON
+        html_content = templates.get_template("report.html").render(context)
+        return {"html": html_content}
+    except Exception as e:
+        logging.error(f"Report generation error: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 @app.get("/legend")
@@ -399,6 +428,42 @@ async def export_data(format: str = "csv"):
             return JSONResponse(status_code=400, content={"message": "Invalid format. Use csv or xlsx."})
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
+
+@app.get("/export-correlations")
+async def export_correlations(method: str = 'pearson', format: str = 'csv'):
+    global current_df
+    if current_df is None:
+        return JSONResponse(status_code=400, content={"message": "No data active"})
+    
+    try:
+        # Calculate full correlation matrix for numeric columns
+        numeric_df = current_df.select_dtypes(include='number')
+        if numeric_df.empty:
+            return JSONResponse(status_code=400, content={"message": "No numeric variables found for correlation."})
+            
+        corr_matrix = numeric_df.corr(method=method)
+        
+        if format.lower() == "csv":
+            stream = io.StringIO()
+            corr_matrix.to_csv(stream, index=True) # index=True to include variable names as row labels
+            response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+            response.headers["Content-Disposition"] = "attachment; filename=correlation_matrix.csv"
+            return response
+        elif format.lower() == "xlsx":
+            stream = io.BytesIO()
+            corr_matrix.to_excel(stream, index=True, engine='openpyxl')
+            stream.seek(0)
+            response = StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            response.headers["Content-Disposition"] = "attachment; filename=correlation_matrix.xlsx"
+            return response
+        else:
+            return JSONResponse(status_code=400, content={"message": "Invalid format. Use csv or xlsx."})
+    except Exception as e:
+        import logging
+        logging.error(f"Correlation export failed: {e}")
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+
 
 if __name__ == "__main__":
     import uvicorn

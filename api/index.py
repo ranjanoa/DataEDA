@@ -411,6 +411,42 @@ async def export_data(format: str = "csv"):
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
+@app.get("/export-correlations")
+async def export_correlations(method: str = 'pearson', format: str = 'csv'):
+    global current_df
+    if current_df is None:
+        return JSONResponse(status_code=400, content={"message": "No data active"})
+    
+    try:
+        # Calculate full correlation matrix for numeric columns
+        numeric_df = current_df.select_dtypes(include='number')
+        if numeric_df.empty:
+            return JSONResponse(status_code=400, content={"message": "No numeric variables found for correlation."})
+            
+        corr_matrix = numeric_df.corr(method=method)
+        
+        if format.lower() == "csv":
+            stream = io.StringIO()
+            corr_matrix.to_csv(stream, index=True) # index=True to include variable names as row labels
+            response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+            response.headers["Content-Disposition"] = "attachment; filename=correlation_matrix.csv"
+            return response
+        elif format.lower() == "xlsx":
+            stream = io.BytesIO()
+            corr_matrix.to_excel(stream, index=True, engine='openpyxl')
+            stream.seek(0)
+            response = StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            response.headers["Content-Disposition"] = "attachment; filename=correlation_matrix.xlsx"
+            return response
+        else:
+            return JSONResponse(status_code=400, content={"message": "Invalid format. Use csv or xlsx."})
+    except Exception as e:
+        import logging
+        logging.error(f"Correlation export failed: {e}")
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+
+
 @app.post("/generate-report")
 async def generate_report(
     data: Dict = Body(...)

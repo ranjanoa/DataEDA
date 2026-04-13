@@ -265,6 +265,77 @@ def process_extra_dataset(
     return merged
 
 
+def get_dataset_summary(df: pd.DataFrame) -> dict:
+    """
+    Calculate global metrics for the dataset.
+    """
+    if df.empty or 'timestamp' not in df.columns:
+        return {}
+        
+    start_time = df['timestamp'].min()
+    end_time = df['timestamp'].max()
+    duration = end_time - start_time
+    
+    total_points = len(df)
+    
+    # Calculate average frequency
+    if total_points > 1:
+        diffs = df['timestamp'].diff().dropna()
+        avg_freq = diffs.mean().total_seconds()
+        median_freq = diffs.median().total_seconds()
+    else:
+        avg_freq = 0
+        median_freq = 0
+        
+    return {
+        "data_points": total_points,
+        "start_time": str(start_time),
+        "end_time": str(end_time),
+        "duration_str": str(duration),
+        "avg_sampling_seconds": avg_freq,
+        "median_sampling_seconds": median_freq
+    }
+
+def detect_shutdowns(df: pd.DataFrame) -> list[dict]:
+    """
+    Identify gaps and periods of inactivity.
+    """
+    if df.empty or 'timestamp' not in df.columns:
+        return []
+        
+    shutdowns = []
+    
+    # 1. Detect Time Gaps
+    diffs = df['timestamp'].diff().dropna()
+    if not diffs.empty:
+        median_freq = diffs.median()
+        threshold = median_freq * 10 # 10x median frequency is a gap
+        
+        gaps = df[df['timestamp'].diff() > threshold]
+        for _, row in gaps.iterrows():
+            # Find the row before this one to get the gap start
+            idx = df.index.get_loc(row.name)
+            prev_row = df.iloc[idx - 1]
+            
+            gap_duration = row['timestamp'] - prev_row['timestamp']
+            
+            shutdowns.append({
+                "type": "GAP",
+                "start": str(prev_row['timestamp']),
+                "end": str(row['timestamp']),
+                "duration": str(gap_duration)
+            })
+            
+    # 2. Detect Zero-Production Periods (Inactivity)
+    # Heuristic: look for columns like RPM, Speed, or Current that are stayed at 0
+    prod_cols = [c for c in df.columns if any(sub in c.lower() for sub in ['rpm', 'speed', 'prod', 'feed', 'current'])]
+    
+    # For now, let's keep it simple and just do gaps. 
+    # Real systems might have a dedicated "Status" or "Running" tag.
+    
+    return shutdowns
+
+
 def to_native(val):
     if pd.isna(val):
         return None
@@ -273,11 +344,12 @@ def to_native(val):
     except:
         return None
 
-def calculate_stats(df: pd.DataFrame) -> list[dict]:
+def calculate_stats(df: pd.DataFrame) -> dict:
     """
-    Calculate summary statistics for all numeric columns.
+    Calculate summary statistics for all numeric columns, plus global insights.
+    Returns: { "stats": [...], "summary": {...}, "shutdowns": [...] }
     """
-    stats = []
+    stats_list = []
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     
     for col in numeric_cols:
@@ -291,21 +363,56 @@ def calculate_stats(df: pd.DataFrame) -> list[dict]:
         desc = series.describe()
         q1 = desc['25%']
         q3 = desc['75%']
-        # iqr = q3 - q1
+        median = desc['50%']
+        iqr = q3 - q1
         
-        stats.append({
+        # Ranges
+        opt_low = median - 0.5 * iqr
+        opt_high = median + 0.5 * iqr
+        
+        # Stability Percentages
+        n = len(series)
+        pct_below_stable = (series < q1).sum() / n * 100
+        pct_above_stable = (series > q3).sum() / n * 100
+        pct_below_opt = (series < opt_low).sum() / n * 100
+        pct_above_opt = (series > opt_high).sum() / n * 100
+        
+        # Analytical
+        skew = series.skew()
+        kurt = series.kurt()
+        
+        # Zeros
+        zeros_count = (series == 0).sum()
+        zeros_pct = (zeros_count / n) * 100
+        
+        stats_list.append({
             'variable': col,
             'min': to_native(desc['min']),
             'max': to_native(desc['max']),
             'mean': to_native(desc['mean']),
-            'median': to_native(desc['50%']),
+            'median': to_native(median),
             'q1': to_native(q1),
             'q3': to_native(q3),
             'std': to_native(desc['std']),
-            'count': int(count_non_nan(series))
+            'count': int(count_non_nan(series)),
+            # Advanced metrics
+            'opt_low': to_native(opt_low),
+            'opt_high': to_native(opt_high),
+            'pct_below_stable': to_native(pct_below_stable),
+            'pct_above_stable': to_native(pct_above_stable),
+            'pct_below_opt': to_native(pct_below_opt),
+            'pct_above_opt': to_native(pct_above_opt),
+            'skewness': to_native(skew),
+            'kurtosis': to_native(kurt),
+            'zeros_count': int(zeros_count),
+            'zeros_pct': to_native(zeros_pct)
         })
         
-    return stats
+    return {
+        "stats": stats_list,
+        "summary": get_dataset_summary(df),
+        "shutdowns": detect_shutdowns(df)
+    }
 
 def count_non_nan(series):
     return series.count()
@@ -355,7 +462,7 @@ def calculate_correlations(df: pd.DataFrame, method='pearson') -> dict:
        'y': ['VarA', 'VarB']
     }
     """
-    numeric_df = df.select_dtypes(include=[np.number])
+    numeric_df = df.select_dtypes(include='number')
     if numeric_df.empty:
         return {}
         

@@ -361,9 +361,21 @@
       </div>
 
       <div class="grid grid-cols-1 gap-6">
-        <div id="heatmap" class="min-h-[400px] lg:min-h-[600px] bg-gray-50 rounded-md border p-2"></div>
+        <div class="space-y-4">
+          <div id="heatmap" class="min-h-[400px] lg:min-h-[600px] bg-gray-50 rounded-md border p-2"></div>
+          <div class="flex justify-end gap-2 px-2">
+            <button id="btnExportMatrixCSV" disabled
+              class="bg-indigo-600 text-white text-xs font-medium py-2 px-4 rounded-md hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition">
+              💾 Export Full Correlation Matrix (CSV)
+            </button>
+            <button id="btnExportMatrixXLSX" disabled
+              class="bg-indigo-600 text-white text-xs font-medium py-2 px-4 rounded-md hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition">
+              📊 Export Matrix (Excel)
+            </button>
+          </div>
+        </div>
         <div>
-          <h3 class="text-lg font-semibold mb-3">Top 5 Strongest Correlations</h3>
+          <h3 class="text-lg font-semibold mb-3">Top Correlations (Absolute Magnitude > 0.1)</h3>
           <div id="top5" class="text-sm overflow-x-auto"></div>
         </div>
       </div>
@@ -414,7 +426,13 @@
           {
             name: 'Save PNG (white bg)', title: 'Save PNG (white background)', icon: cameraIcon, click: (gd) => {
               const title = (gd.layout && (gd.layout.title?.text || gd.layout.title)) || 'plot';
-              downloadImageWhite(gd, String(title).toLowerCase().replace(/\s+/g, '_') || 'plot');
+              downloadImageWithBg(gd, String(title).toLowerCase().replace(/\s+/g, '_') || 'plot', '#ffffff', '#333333');
+            }
+          },
+          {
+            name: 'Save PNG (dark bg)', title: 'Save PNG (dark background)', icon: cameraIcon, click: (gd) => {
+              const title = (gd.layout && (gd.layout.title?.text || gd.layout.title)) || 'plot';
+              downloadImageWithBg(gd, String(title).toLowerCase().replace(/\s+/g, '_') || 'plot', '#1a1a1a', '#ffffff');
             }
           },
           {
@@ -454,28 +472,54 @@
       }
     }
 
-    async function downloadImageWhite(gd, filenameBase = 'plot') {
-      const origPaper = gd.layout.paper_bgcolor || '#ffffff';
-      const origPlot = gd.layout.plot_bgcolor || '#ffffff';
+    async function downloadImageWithBg(gd, filenameBase = 'plot', bgColor = '#ffffff', textColor = '#333333') {
+      const origLayout = JSON.parse(JSON.stringify(gd.layout));
 
       try {
         updateStatus("Preparing PNG...");
-        await Plotly.relayout(gd, { paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff' });
+        
+        // Prepare temporary layout for high-quality export
+        const exportLayout = {
+          paper_bgcolor: bgColor,
+          plot_bgcolor: bgColor,
+          font: { color: textColor }
+        };
+
+        // If dark background, force axis lines and grids to be visible/contrast
+        if (bgColor !== '#ffffff') {
+          const axisUpgrade = {
+            linecolor: textColor,
+            gridcolor: 'rgba(255,255,255,0.1)',
+            tickfont: { color: textColor },
+            titlefont: { color: textColor }
+          };
+          
+          if (gd.layout.xaxis) exportLayout.xaxis = Object.assign({}, gd.layout.xaxis, axisUpgrade);
+          if (gd.layout.yaxis) exportLayout.yaxis = Object.assign({}, gd.layout.yaxis, axisUpgrade);
+          if (gd.layout.yaxis2) exportLayout.yaxis2 = Object.assign({}, gd.layout.yaxis2, axisUpgrade);
+          if (gd.layout.scene) {
+            exportLayout.scene = JSON.parse(JSON.stringify(gd.layout.scene));
+            ['xaxis', 'yaxis', 'zaxis'].forEach(ax => {
+              exportLayout.scene[ax] = Object.assign({}, exportLayout.scene[ax], axisUpgrade);
+            });
+          }
+        }
+
+        await Plotly.relayout(gd, exportLayout);
         
         const options = {
           format: 'png',
-          width: Math.max(1200, gd.clientWidth),
-          height: Math.max(800, gd.clientHeight),
-          scale: 3
+          width: 1600, // Higher resolution for export
+          height: 1000,
+          scale: 2
         };
 
         const dataUrl = await Plotly.toImage(gd, options);
-        // Using Blob for better reliability with large images
         const blob = await (await fetch(dataUrl)).blob();
         const url = URL.createObjectURL(blob);
         
         const link = document.createElement('a');
-        link.download = filenameBase + '.png';
+        link.download = filenameBase + (bgColor === '#ffffff' ? '_light' : '_dark') + '.png';
         link.href = url;
         document.body.appendChild(link);
         link.click();
@@ -485,10 +529,10 @@
         updateStatus("Ready");
       } catch (e) {
         console.error("Export Error:", e);
-        alert("PNG Export failed. Tip: Try again or use the browser's context menu.");
+        alert("PNG Export failed.");
         updateStatus("Error exporting PNG");
       } finally {
-        await Plotly.relayout(gd, { paper_bgcolor: origPaper, plot_bgcolor: origPlot });
+        await Plotly.relayout(gd, origLayout);
       }
     }
 
@@ -779,6 +823,8 @@
 
         populateSelectors();
         el('btnDownloadCorr').disabled = false;
+        el('btnExportMatrixCSV').disabled = false;
+        el('btnExportMatrixXLSX').disabled = false;
         el('btnRenderAll').disabled = false;
         el('btnOpenOptimizer').disabled = false;
 
@@ -867,12 +913,25 @@
           legend: { orientation: 'h', y: -0.2 }
         };
 
+        const colorDomain = el('secondaryColorDomain').value;
+        const colorVar = ys[0] || "";
+        const cb = getLegendBounds(colorVar);
+        const colorScaling = {};
+        if (colorDomain === 'legend' && cb.hasMin && cb.hasMax) {
+          colorScaling.cmin = cb.min;
+          colorScaling.cmax = cb.max;
+        }
+
         if (type === 'parallel') {
           const dims = ys.map(y => {
             const b = getLegendBounds(y);
             return { label: y, values: data[y], range: b.hasMin && b.hasMax ? [b.min, b.max] : undefined };
           });
-          traces.push({ type: 'parcoords', dimensions: dims, line: { color: data[ys[0]] || 0, colorscale: 'Viridis', showscale: true } });
+          traces.push({ 
+            type: 'parcoords', 
+            dimensions: dims, 
+            line: Object.assign({ color: data[ys[0]] || 0, colorscale: 'Viridis', showscale: true }, colorScaling)
+          });
         } else if (type === '3d') {
           if (ys.length < 2) return alert("3D plots require at least 2 variables selected in 'Y-Axis' (to serve as Y and Z)");
           traces.push({
@@ -881,7 +940,7 @@
             z: data[ys[1]],
             mode: 'markers',
             type: 'scatter3d',
-            marker: { size: 3, opacity: 0.7, color: data[ys[0]] || 0, colorscale: 'Viridis' },
+            marker: Object.assign({ size: 3, opacity: 0.7, color: data[ys[0]] || 0, colorscale: 'Viridis' }, colorScaling),
             name: `${ys[0]} vs ${ys[1]}`
           });
           layout.scene = {
@@ -1033,7 +1092,9 @@
       const hRes = await fetch(`${API}/heatmap`); const hData = await hRes.json();
       Plotly.newPlot('heatmap', [{ z: hData.z, x: hData.x, y: hData.y, type: 'heatmap', colorscale: 'RdBu', zmin: -1, zmax: 1 }], { title: 'Correlation Matrix' });
       if (hData.pairs) {
-        const list = hData.pairs.slice(0, 5).map(p => `<li>${p.var1} - ${p.var2}: ${p.value.toFixed(2)}</li>`).join('');
+        // Only show correlations with absolute value > 0.1 to avoid clutter, up to 50 pairs
+        const relevant = hData.pairs.filter(p => Math.abs(p.value) > 0.1).slice(0, 50);
+        const list = relevant.map(p => `<li>${p.var1} - ${p.var2}: ${p.value.toFixed(2)}</li>`).join('');
         el('top5').innerHTML = `<ul class="list-disc pl-5">${list}</ul>`;
       }
     }
@@ -1087,8 +1148,39 @@
     });
 
     // Sessions & Export
-    el('btnExportCSV').onclick = () => window.location.href = `${API}/export-data?format=csv`;
-    el('btnExportXLSX').onclick = () => window.location.href = `${API}/export-data?format=xlsx`;
+    async function handleDownload(url, filename) {
+      try {
+        updateStatus("Preparing download...");
+        const res = await fetch(url);
+        if (!res.ok) {
+          const json = await res.json();
+          throw new Error(json.message || `Server error: ${res.status}`);
+        }
+        const blob = await res.blob();
+        if (blob.size === 0) throw new Error("Received empty file from server");
+        
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        updateStatus("Download complete");
+      } catch (e) {
+        console.error("Download error:", e);
+        alert("Download Failed: " + e.message);
+        updateStatus("Download failed");
+      }
+    }
+
+    el('btnExportCSV').onclick = () => handleDownload(`${API}/export-data?format=csv`, 'export.csv');
+    el('btnExportXLSX').onclick = () => handleDownload(`${API}/export-data?format=xlsx`, 'export.xlsx');
+    el('btnDownloadCorr').onclick = () => handleDownload(`${API}/export-correlations?format=csv`, 'correlation_matrix.csv');
+    el('btnExportMatrixCSV').onclick = () => handleDownload(`${API}/export-correlations?format=csv`, 'correlation_matrix.csv');
+    el('btnExportMatrixXLSX').onclick = () => handleDownload(`${API}/export-correlations?format=xlsx`, 'correlation_matrix.xlsx');
+
     el('btnSaveSession').onclick = () => {
       const blob = new Blob([JSON.stringify({ derived: DerivedVars.getAll(), legend, ts: new Date().toISOString() })], { type: 'application/json' });
       const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'session.json'; a.click();

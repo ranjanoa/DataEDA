@@ -474,7 +474,7 @@ def calculate_correlations(df: pd.DataFrame, method='pearson') -> dict:
        'y': ['VarA', 'VarB']
     }
     """
-    numeric_df = df.select_dtypes(include=[np.number])
+    numeric_df = df.select_dtypes(include='number')
     if numeric_df.empty:
         return {}
         
