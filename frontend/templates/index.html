@@ -192,62 +192,50 @@
       <!-- Right Column: Derived Variables & Plot Creator -->
       <div class="lg:col-span-2 space-y-6">
         <!-- Derived Variables Box -->
-        <div class="bg-white p-6 rounded-lg shadow-md space-y-4" id="derivedBox">
-          <h2 class="text-lg font-semibold border-b pb-2 mb-4">Derived Variables</h2>
+        <div class="glass p-6 rounded-2xl border border-white/10 shadow-lg space-y-4" id="derivedBox">
+          <h2 class="text-xl font-tech neon-text mb-4 uppercase tracking-tight">System Extensions (Derived Vars)</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-            <input id="derivedName" placeholder="Name (e.g. SFC)"
-              class="col-span-1 md:col-span-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            <input id="derivedExpr" placeholder="Expression (e.g., Coal_Feed / Clinker_Prod)"
-              class="col-span-1 md:col-span-2 lg:col-span-3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" />
-            <input id="derivedUnit" placeholder="Unit"
-              class="col-span-1 md:col-span-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
-            <input id="derivedMin" placeholder="Legend Min"
-              class="col-span-1 md:col-span-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
-            <input id="derivedMax" placeholder="Legend Max"
-              class="col-span-1 md:col-span-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
+            <input id="derivedName" placeholder="Variable Name (e.g. SFC)" class="p-2 rounded-lg" />
+            <input id="derivedExpr" placeholder="Logic (e.g. Coal_Feed / Clinker_Prod)" class="col-span-1 md:col-span-2 lg:col-span-3 p-2 rounded-lg" />
+            <input id="derivedUnit" placeholder="Unit" class="p-2 rounded-lg" />
+            <input id="derivedMin" placeholder="Legend Min" class="p-2 rounded-lg" />
+            <input id="derivedMax" placeholder="Legend Max" class="p-2 rounded-lg" />
             <div class="col-span-1 md:col-span-3 lg:col-span-3 flex gap-2 justify-end">
-              <button id="btnTestDerived"
-                class="bg-yellow-500 text-white text-xs font-medium py-1.5 px-3 rounded-md hover:bg-yellow-600">Test</button>
-              <button id="btnAddDerived"
-                class="bg-green-600 text-white text-xs font-medium py-1.5 px-3 rounded-md hover:bg-green-700">Add</button>
+              <button id="btnTestDerived" class="bg-amber-600/80 text-white px-4 py-2 rounded-lg font-bold hover:bg-amber-500 transition shadow-sm">VALIDATE</button>
+              <button id="btnAddDerived" class="bg-emerald-600/80 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-500 transition shadow-sm">COMMIT</button>
             </div>
           </div>
-          <div id="derivedMsg" class="mt-2 text-sm text-gray-600"></div>
-          <div id="derivedList" class="mt-4 max-h-48 overflow-y-auto border-t pt-4 space-y-2"></div>
+          <div id="derivedMsg" class="mt-2 text-xs font-tech text-cyan-300"></div>
+          <div id="derivedList" class="mt-4 max-h-48 overflow-y-auto border-t border-white/10 pt-4 space-y-2"></div>
         </div>
 
         <!-- Custom Plot Creator Box -->
-        <div class="bg-white p-6 rounded-lg shadow-md space-y-4" id="customPlotBox">
-          <h2 class="text-lg font-semibold border-b pb-2 mb-4">Custom Plot Creator</h2>
+        <div class="glass p-6 rounded-2xl border border-white/10 shadow-lg space-y-4" id="customPlotBox">
+          <h2 class="text-xl font-tech neon-text mb-4 uppercase tracking-tight">Visual Synthesis Engine</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
             <div>
-              <label for="plotType" class="block text-sm font-medium text-gray-700">Plot Type</label>
-              <select id="plotType"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
-                <option value="time">Time-series (Y vs Time)</option>
-                <option value="multi">Multi overlay (multiple Y vs Time)</option>
-                <option value="scatter">X vs Y scatter</option>
-                <option value="dual">Dual-Y (scatter)</option>
-                <option value="3d">3D scatter (X, Y, Z)</option>
+              <label for="plotType" class="block text-xs font-medium text-gray-400 uppercase mb-1">Visualization Type</label>
+              <select id="plotType" class="w-full p-2 rounded-lg">
+                <option value="time">Temporal Stream (Y vs Time)</option>
+                <option value="multi">Multi Overlay (Y vs Time)</option>
+                <option value="scatter">Dual-Vector Analysis (X vs Y)</option>
+                <option value="dual">Dual-Y Axis</option>
+                <option value="3d">Trimetric Matrix (X, Y, Z)</option>
                 <option value="parallel">Parallel Coordinates</option>
               </select>
             </div>
             <div>
-              <label for="xSelect" class="block text-sm font-medium text-gray-700">X-Axis</label>
-              <select id="xSelect"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm">
+              <label for="xSelect" class="block text-xs font-medium text-gray-400 uppercase mb-1">X-Axis Coordinate</label>
+              <select id="xSelect" class="w-full p-2 rounded-lg">
                 <option value="timestamp">timestamp</option>
               </select>
             </div>
             <div class="lg:col-span-2">
               <div class="flex justify-between items-center">
-                <label for="ySelect" class="block text-sm font-medium text-gray-700">Y-Axis (Select multiple)</label>
-                <button id="btnSelectAllY"
-                  class="bg-gray-200 text-gray-700 text-xs font-medium py-1 px-2 rounded-md hover:bg-gray-300">Select
-                  All</button>
+                <label for="ySelect" class="block text-xs font-medium text-gray-400 uppercase mb-1">Primary Y-Axis</label>
+                <button id="btnSelectAllY" class="text-[10px] text-cyan-400 uppercase hover:underline">Select All</button>
               </div>
-              <select id="ySelect" multiple size="4"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"></select>
+              <select id="ySelect" multiple size="4" class="w-full p-2 rounded-lg"></select>
             </div>
             <div>
               <label for="rightAxisSelect" class="block text-sm font-medium text-gray-700">Right Y-Axis (for
@@ -315,25 +303,25 @@
 
     <!-- Global Insights Dashboard -->
     <div id="insightDashboard" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
-        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Data Points</h3>
-        <p id="insightPoints" class="text-2xl font-bold text-gray-800 mt-1">0</p>
-        <p class="text-xs text-gray-500 mt-1">Samples analyzed</p>
+      <div class="glass p-6 rounded-2xl border-l-4 border-cyan-500 shadow-cyan-500/10">
+        <h3 class="text-xs font-tech text-cyan-400 uppercase tracking-wider">Total Samples</h3>
+        <p id="insightPoints" class="text-3xl font-tech neon-text mt-1">0</p>
+        <p class="text-[10px] text-gray-500 uppercase mt-1">Ingested Records</p>
       </div>
-      <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-indigo-500">
-        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Duration</h3>
-        <p id="insightDuration" class="text-lg font-bold text-gray-800 mt-1">0h 0m</p>
-        <p id="insightTimeRange" class="text-xs text-gray-500 mt-1">Start - End</p>
+      <div class="glass p-6 rounded-2xl border-l-4 border-indigo-500 shadow-indigo-500/10">
+        <h3 class="text-xs font-tech text-indigo-400 uppercase tracking-wider">Temporal Span</h3>
+        <p id="insightDuration" class="text-xl font-tech text-white mt-1">0h 0m</p>
+        <p id="insightTimeRange" class="text-[10px] text-gray-500 uppercase mt-1">T-Start ➔ T-End</p>
       </div>
-      <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
-        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Avg. Frequency</h3>
-        <p id="insightFrequency" class="text-2xl font-bold text-gray-800 mt-1">0s</p>
-        <p class="text-xs text-gray-500 mt-1">Time between samples</p>
+      <div class="glass p-6 rounded-2xl border-l-4 border-green-500 shadow-green-500/10">
+        <h3 class="text-xs font-tech text-green-400 uppercase tracking-wider">Mean Frequency</h3>
+        <p id="insightFrequency" class="text-3xl font-tech text-white mt-1">0s</p>
+        <p class="text-[10px] text-gray-500 uppercase mt-1">Resolution Speed</p>
       </div>
-      <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500">
-        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Shutdown Periods</h3>
-        <p id="insightShutdownCount" class="text-2xl font-bold text-gray-800 mt-1">0</p>
-        <p id="insightShutdownMsg" class="text-xs text-gray-500 mt-1">Detected gaps/zeros</p>
+      <div class="glass p-6 rounded-2xl border-l-4 border-red-500 shadow-red-500/10">
+        <h3 class="text-xs font-tech text-red-400 uppercase tracking-wider">Anomalies</h3>
+        <p id="insightShutdownCount" class="text-3xl font-tech text-red-400 mt-1">0</p>
+        <p id="insightShutdownMsg" class="text-[10px] text-gray-500 uppercase mt-1">Disruptions Detected</p>
       </div>
     </div>
 
@@ -343,20 +331,23 @@
       <div id="shutdownList" class="text-sm space-y-2 max-h-40 overflow-y-auto"></div>
     </div>
 
-    <!-- AI Assistant Box (Full Width) -->
-    <div class="bg-white p-6 rounded-lg shadow-md space-y-4" id="aiAssistantBox">
-      <h2 class="text-lg font-semibold border-b pb-2 mb-4">🤖 AI Assistant</h2>
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
-        <div class="md:col-span-1 space-y-1">
-          <label for="apiKey" class="block text-sm font-medium text-gray-700">API Key</label>
-          <input type="password" id="apiKey" placeholder="sk-... / API_KEY"
-            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm" />
-          <label for="aiProvider" class="block text-sm font-medium text-gray-700 mt-2">AI Provider</label>
-          <select id="aiProvider" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm">
-            <option value="openai" selected>OpenAI (GPT-4o)</option>
-            <option value="gemini">Google Gemini (1.5 Flash)</option>
-            <option value="custom">Custom (OpenAI-compatible)</option>
-          </select>
+    <!-- AI Assistant Box -->
+    <div class="glass p-6 rounded-3xl border border-white/10 shadow-2xl space-y-4" id="aiAssistantBox">
+      <h2 class="text-xl font-tech neon-text uppercase border-b border-white/10 pb-4">🤖 Cognitive Intelligence Module</h2>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+        <div class="md:col-span-1 space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-400 uppercase mb-1">Access Protocol (API Key)</label>
+            <input type="password" id="apiKey" placeholder="Secure Entry..." class="w-full p-2 rounded-lg" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-400 uppercase mb-1">Neural Core</label>
+            <select id="aiProvider" class="w-full p-2 rounded-lg">
+              <option value="openai">OpenAI (GPT-4o)</option>
+              <option value="gemini">Google Gemini (1.5)</option>
+              <option value="custom">Proxy Relay</option>
+            </select>
+          </div>
           <div id="customApiBox" class="hidden mt-2">
             <label for="apiUrl" class="block text-sm font-medium text-gray-700">Base URL</label>
             <input type="text" id="apiUrl" placeholder="https://api.yourproxy.com/v1"
