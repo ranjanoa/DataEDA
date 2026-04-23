@@ -80,6 +80,10 @@ async def read_tutorial():
             return HTMLResponse(content=f.read())
     return {"message": "Tutorial page not found."}
 
+@app.get("/favicon.ico")
+async def favicon():
+    return JSONResponse(status_code=204)
+
 @app.post("/upload")
 async def upload_files(files: List[UploadFile] = File(...)):
     global data_files, legend_data, current_df
