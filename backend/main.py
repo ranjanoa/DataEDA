@@ -34,7 +34,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from data_processor import (
     load_data, merge_datasets, calculate_stats, downsample_for_plot, 
     calculate_correlations, parse_legend, filter_columns, 
-    calculate_derived_var, get_stability_bands, process_extra_dataset
+    calculate_derived_var, get_stability_bands, process_extra_dataset,
+    get_dataset_summary, detect_shutdowns
 )
 
 app = FastAPI()
@@ -211,8 +212,14 @@ async def get_stats():
     if current_df is None:
         return JSONResponse(status_code=400, content={"message": "No data active"})
     try:
-        stats_data = calculate_stats(current_df)
-        return stats_data
+        stats = calculate_stats(current_df)
+        summary = get_dataset_summary(current_df)
+        shutdowns = detect_shutdowns(current_df)
+        return {
+            "stats": stats, 
+            "summary": summary, 
+            "shutdowns": shutdowns
+        }
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
@@ -467,4 +474,14 @@ async def export_correlations(method: str = 'pearson', format: str = 'csv'):
 
 if __name__ == "__main__":
     import uvicorn
+    import webbrowser
+    from threading import Timer
+
+    def open_browser():
+        webbrowser.open_new("http://127.0.0.1:8000")
+
+    # Start a timer to open the browser after a short delay to ensure the server is up
+    Timer(1.5, open_browser).start()
+    
+    # Run uvicorn server
     uvicorn.run(app, host="127.0.0.1", port=8000)
