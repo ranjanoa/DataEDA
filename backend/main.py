@@ -72,6 +72,14 @@ async def read_root():
             return HTMLResponse(content=f.read())
     return {"message": "Backend is running. Frontend index.html not found."}
 
+@app.get("/tutorial")
+async def read_tutorial():
+    path = get_resource_path(os.path.join("frontend", "templates", "tutorial.html"))
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            return HTMLResponse(content=f.read())
+    return {"message": "Tutorial page not found."}
+
 @app.post("/upload")
 async def upload_files(files: List[UploadFile] = File(...)):
     global data_files, legend_data
