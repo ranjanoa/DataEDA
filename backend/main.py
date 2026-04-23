@@ -82,7 +82,12 @@ async def read_tutorial():
 
 @app.post("/upload")
 async def upload_files(files: List[UploadFile] = File(...)):
-    global data_files, legend_data
+    global data_files, legend_data, current_df
+    # Clear previous state for a fresh upload session
+    data_files = {}
+    legend_data = {}
+    current_df = None
+    
     uploaded_names = []
     
     for file in files:
@@ -218,18 +223,19 @@ async def get_columns():
 async def get_stats():
     global current_df
     if current_df is None:
-        return JSONResponse(status_code=400, content={"message": "No data active"})
+        return {"summary": {}, "stats": [], "shutdowns": []}
+        
     try:
-        stats = calculate_stats(current_df)
-        summary = get_dataset_summary(current_df)
-        shutdowns = detect_shutdowns(current_df)
+        # calculate_stats in data_processor.py already returns {stats, summary, shutdowns}
+        result = calculate_stats(current_df)
         return {
-            "stats": stats, 
-            "summary": summary, 
-            "shutdowns": shutdowns
+            "summary": result.get("summary", {}),
+            "stats": result.get("stats", []),
+            "shutdowns": result.get("shutdowns", [])
         }
     except Exception as e:
-        return JSONResponse(status_code=500, content={"message": str(e)})
+        logging.error(f"Stats failed: {e}")
+        return {"summary": {}, "stats": [], "shutdowns": []}
 
 @app.post("/generate-report")
 async def generate_report(data: Dict = Body(...)):
