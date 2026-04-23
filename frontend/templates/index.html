@@ -11,10 +11,15 @@
 
 <body class="bg-gray-100 text-gray-800 font-sans p-4 lg:p-6">
   <div class="max-w-7xl mx-auto space-y-6">
-    <header class="bg-white p-6 rounded-lg shadow-md">
-      <h1 class="text-2xl font-bold text-gray-800">Dashboard - Process Analysis</h1>
-      <p class="text-sm text-gray-600 mt-1">Load CSV/XLSX data & LEGEND.csv(optional). Explore correlations, trends,
-        stability, and create custom plots.</p>
+    <header class="bg-white p-6 rounded-lg shadow-md flex justify-between items-start">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">Dashboard - Process Analysis</h1>
+        <p class="text-sm text-gray-600 mt-1">Load CSV/XLSX data & LEGEND.csv(optional). Explore correlations, trends,
+          stability, and create custom plots.</p>
+      </div>
+      <button id="btnOpenTutorial" class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-md font-semibold hover:bg-indigo-200 transition flex items-center gap-2">
+        <span>📖</span> Help / Tutorial
+      </button>
     </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1240,7 +1245,39 @@
       }
     };
 
+    const tutorialModal = document.getElementById('tutorialModal');
+    if (document.getElementById('btnOpenTutorial')) {
+        document.getElementById('btnOpenTutorial').onclick = () => tutorialModal.classList.remove('hidden');
+        document.getElementById('btnCloseTutorial').onclick = () => tutorialModal.classList.add('hidden');
+        document.getElementById('btnCloseTutorialBottom').onclick = () => tutorialModal.classList.add('hidden');
+    }
   </script>
+  <!-- Help / Tutorial Modal -->
+  <div id="tutorialModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4 text-left">
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="px-6 py-4 border-b flex justify-between items-center bg-indigo-600 text-white">
+        <h2 class="text-xl font-bold">🚀 Getting Started with Data Analysis CSV</h2>
+        <button id="btnCloseTutorial" class="text-white hover:text-indigo-200 text-2xl">&times;</button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-6 text-gray-700">
+        <section>
+          <h3 class="text-lg font-bold text-indigo-600 mb-2">1. Uploading Data</h3>
+          <p>Select your CSV/Excel files and an optional LEGEND file. Click "Merge & Process Data" to begin.</p>
+        </section>
+        <section>
+          <h3 class="text-lg font-bold text-indigo-600 mb-2">2. Custom Visualizations</h3>
+          <p>Use the "Custom Plot Creator" to generate 3D charts, scatter plots, and dual-axis graphs.</p>
+        </section>
+        <section>
+          <h3 class="text-lg font-bold text-indigo-600 mb-2">3. AI-Powered Insights</h3>
+          <p>Connect your API key to get instant analysis of trends and process stability.</p>
+        </section>
+      </div>
+      <div class="px-6 py-4 border-t bg-gray-50 flex justify-end">
+        <button id="btnCloseTutorialBottom" class="bg-indigo-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-indigo-700">Got it!</button>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>
