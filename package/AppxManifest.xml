@@ -7,11 +7,11 @@
 
   <Identity
     Name="ranjanoa.DataEDA"
-    Publisher="CN=ranjanoa"
+    Publisher="CN=801061F4-20CF-4CA3-8BCC-A55B61A8AD0C"
     Version="1.0.0.0" />
 
   <Properties>
-    <DisplayName>DataEDA - Process Analysis</DisplayName>
+    <DisplayName>Data Analysis CSV and XLSX</DisplayName>
     <PublisherDisplayName>ranjanoa</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -30,7 +30,7 @@
       Executable="DataEDA.exe"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="DataEDA"
+        DisplayName="Data Analysis"
         Description="Advanced Data Analysis and EDA Tool for Industrial Processes."
         BackgroundColor="#0d1117"
         Square150x150Logo="Assets\Square150x150Logo.png"
