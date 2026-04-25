@@ -1,9 +1,9 @@
 # Build MSIX Package Script for DataEDA
 
-# Find makeappx.exe dynamically
-$makeappx = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makeappx.exe" | Select-Object -First 1 -ExpandProperty FullName)
+# Find makeappx.exe dynamically (preferring x64)
+$makeappx = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makeappx.exe" | Where-Object { $_.FullName -like "*\x64\*" } | Select-Object -First 1 -ExpandProperty FullName)
 if (-not $makeappx) {
-    $makeappx = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter "makeappx.exe" | Select-Object -First 1 -ExpandProperty FullName)
+    $makeappx = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter "makeappx.exe" | Where-Object { $_.FullName -like "*\x64\*" } | Select-Object -First 1 -ExpandProperty FullName)
 }
 
 if (-not $makeappx) {
