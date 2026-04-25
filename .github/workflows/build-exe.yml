@@ -1,4 +1,4 @@
-name: Build EXE
+name: Build EXE and MSIX
 
 on:
   push:
@@ -33,15 +33,15 @@ jobs:
         npm install
         npm run build:css
         
-    - name: Build EXE with PyInstaller
+    - name: Build EXE and MSIX
+      shell: pwsh
       run: |
-        pyinstaller --onefile --noconsole --name "DataEDA" `
-        --add-data "frontend;frontend" `
-        --paths "backend" `
-        backend/main.py
+        ./build_msix.ps1
         
-    - name: Upload Artifact
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: DataEDA-exe
-        path: dist/DataEDA.exe
+        name: DataEDA-Builds
+        path: |
+          dist/DataEDA.exe
+          DataEDA.msix

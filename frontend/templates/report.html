@@ -192,7 +192,7 @@
             </div>
             <div class="card">
                 <div class="card-label">Avg. Sampling</div>
-                <div class="card-value">{{ summary.avg_sampling_seconds|round(1) }}s</div>
+                <div class="card-value">{{ summary.avg_sampling_seconds|default(0)|round(1) }}s</div>
             </div>
         </div>
         
@@ -236,13 +236,13 @@
                 {% for s in stats %}
                 <tr>
                     <td><strong>{{ s.variable }}</strong></td>
-                    <td>{{ s.min|round(2) }}</td>
-                    <td>{{ s.max|round(2) }}</td>
-                    <td>{{ s.mean|round(2) }}</td>
-                    <td>{{ s.median|round(2) }}</td>
-                    <td>{{ s.zeros_count }} ({{ s.zeros_pct|round(1) }}%)</td>
-                    <td>{{ s.skewness|round(2) }}</td>
-                    <td>{{ s.kurtosis|round(2) }}</td>
+                    <td>{{ s.min|default(0)|round(2) }}</td>
+                    <td>{{ s.max|default(0)|round(2) }}</td>
+                    <td>{{ s.mean|default(0)|round(2) }}</td>
+                    <td>{{ s.median|default(0)|round(2) }}</td>
+                    <td>{{ s.zeros_count }} ({{ s.zeros_pct|default(0)|round(1) }}%)</td>
+                    <td>{{ s.skewness|default(0)|round(2) }}</td>
+                    <td>{{ s.kurtosis|default(0)|round(2) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -255,7 +255,7 @@
         <p style="font-size: 14px; color: #64748b; margin-bottom: 10px;">The following variable pairs show the most significant linear relationships.</p>
         <ul style="font-size: 14px;">
             {% for p in correlations %}
-            <li><strong>{{ p.var1 }} — {{ p.var2 }}:</strong> {{ p.value|round(3) }}</li>
+            <li><strong>{{ p.var1 }} — {{ p.var2 }}:</strong> {{ p.value|default(0)|round(3) }}</li>
             {% endfor %}
         </ul>
     </section>

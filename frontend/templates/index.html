@@ -100,8 +100,8 @@
           <input type="file" id="fileLegend" accept=".csv,text/csv" class="block w-full text-xs text-gray-400" />
         </div>
         <button id="btnMergeAndProcess"
-          class="w-full bg-cyan-600 text-white font-tech py-3 px-4 rounded-xl shadow-lg hover:bg-cyan-500 transition-all glow-hover uppercase text-xs">
-          RUN DATA MERGE
+          class="w-full bg-cyan-600 text-white font-tech py-3 rounded-xl hover:bg-cyan-500 transition glow-hover uppercase tracking-widest text-sm shadow-lg shadow-cyan-500/20">
+          Run Data Processing
         </button>
         <div class="flex items-center space-x-2 text-xs">
           <label for="minNonZero" class="text-gray-400 uppercase">Density Threshold</label>
@@ -113,15 +113,11 @@
           <span class="status-pulse"></span> SYSTEM: READY
         </div>
         <div class="flex flex-wrap gap-2 pt-2 border-t mt-4">
-          <button id="btnDownloadCorr" disabled
-            class="bg-gray-200 text-gray-400 text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">Download
-            Correlations</button>
           <button id="btnRenderAll" disabled
-            class="bg-gray-200 text-gray-400 text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">Render
-            All Plots Grid</button>
+            class="bg-gray-200 text-gray-400 text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-tighter">Render
+            All Grid</button>
           <button id="btnOpenOptimizer" disabled
-            class="bg-gray-200 text-gray-400 text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">SFC
-            Optimizer (Disabled)</button>
+            class="bg-gray-200 text-gray-400 text-xs font-medium py-1.5 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-tighter">Optimizer</button>
         </div>
 
         <div class="mt-4 border-t pt-4">
@@ -163,29 +159,6 @@
             class="mt-2 bg-slate-900/80 text-white text-xs font-medium py-1.5 px-3 rounded-md hover:bg-blue-600">Add dataset
             & align</button>
           <div id="extraStatus" class="text-xs text-gray-500 mt-1"></div>
-        </div>
-
-        <div class="mt-4 border-t pt-4">
-          <h3 class="text-sm font-semibold text-white mb-2">Export & Session</h3>
-          <div class="grid grid-cols-2 gap-2 mb-2">
-            <button id="btnExportCSV"
-              class="bg-indigo-500 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-indigo-600 text-center">Export
-              CSV</button>
-            <button id="btnExportXLSX"
-              class="bg-indigo-500 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-indigo-600 text-center">Export
-              Excel</button>
-            <button id="btnGenerateReport"
-              class="col-span-2 bg-blue-700 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-blue-800 text-center">Generate
-              Analysis Report</button>
-          </div>
-          <div class="flex gap-2">
-            <button id="btnSaveSession"
-              class="flex-1 bg-green-600 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-green-700">Save
-              Session</button>
-            <button id="btnLoadSessionTrigger"
-              class="flex-1 bg-gray-600 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-gray-700">Load</button>
-            <input type="file" id="fileLoadSession" accept=".json" class="hidden" />
-          </div>
         </div>
       </div>
 
@@ -425,17 +398,8 @@
 
       <div class="grid grid-cols-1 gap-6">
         <div class="space-y-4">
+          <!-- Correlation Matrix Plot -->
           <div id="heatmap" class="min-h-[400px] lg:min-h-[600px] bg-slate-900/50 rounded-md border p-2"></div>
-          <div class="flex justify-end gap-2 px-2">
-            <button id="btnExportMatrixCSV" disabled
-              class="bg-indigo-600 text-white text-xs font-medium py-2 px-4 rounded-md hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition">
-              💾 Export Full Correlation Matrix (CSV)
-            </button>
-            <button id="btnExportMatrixXLSX" disabled
-              class="bg-indigo-600 text-white text-xs font-medium py-2 px-4 rounded-md hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition">
-              📊 Export Matrix (Excel)
-            </button>
-          </div>
         </div>
         <div>
           <h3 class="text-lg font-semibold mb-3">Top Correlations (Absolute Magnitude > 0.1)</h3>
