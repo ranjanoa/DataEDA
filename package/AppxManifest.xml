@@ -11,7 +11,7 @@
     Version="1.0.0.0" />
 
   <Properties>
-    <DisplayName>Data Analysis CSV and XLSX</DisplayName>
+    <DisplayName>DataEDA</DisplayName>
     <PublisherDisplayName>ranjanoa</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -30,7 +30,7 @@
       Executable="DataEDA.exe"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="Data Analysis"
+        DisplayName="DataEDA"
         Description="Advanced Data Analysis and EDA Tool for Industrial Processes."
         BackgroundColor="#0d1117"
         Square150x150Logo="Assets\Square150x150Logo.png"
