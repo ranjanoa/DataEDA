@@ -8,7 +8,7 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -82,7 +82,7 @@ async def read_tutorial():
 
 @app.get("/favicon.ico")
 async def favicon():
-    return JSONResponse(status_code=204)
+    return Response(status_code=204)
 
 @app.post("/upload")
 async def upload_files(files: List[UploadFile] = File(...)):
