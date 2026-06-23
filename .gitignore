@@ -39,3 +39,12 @@ yarn-error.log*
 
 # Project specific
 # frontend/static/css/output.css is committed so Docker doesn't need Node.js
+
+# Antigravity Brain cache & scratch folders
+brain/
+scratch/
+msix_layout/
+DataEDA.msix
+DataEDA.spec
+project/
+

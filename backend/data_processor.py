@@ -38,8 +38,8 @@ def load_data(file_content: bytes, filename: str) -> pd.DataFrame:
             # Fallback to first column
             time_col = df.columns[0]
             
-        # Parse timestamps
-        df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
+        # Parse timestamps (dayfirst=True to handle dd/mm/yyyy format correctly and avoid warnings)
+        df[time_col] = pd.to_datetime(df[time_col], errors='coerce', dayfirst=True)
         df = df.dropna(subset=[time_col])
         df = df.sort_values(by=time_col)
         df = df.rename(columns={time_col: 'timestamp'})
@@ -48,7 +48,7 @@ def load_data(file_content: bytes, filename: str) -> pd.DataFrame:
         for col in df.columns:
             if col != 'timestamp':
                 # Replace comma with dot for European formats
-                if df[col].dtype == object:
+                if pd.api.types.is_string_dtype(df[col]):
                      df[col] = df[col].astype(str).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce')
                 
@@ -192,14 +192,17 @@ def calculate_derived_var(df: pd.DataFrame, name: str, formula: str) -> pd.DataF
     Add a new column based on a formula.
     Uses pandas.eval()
     """
+    import re
     try:
-        # Sanitize formula to prevent unsafe execution? 
-        # pd.eval is relatively safe for arithmetic, but strictly speaking allows some calls.
-        # For a local tool, this is acceptable.
-        
-        # We need to handle column names with spaces or special chars if any remained
-        # But we stripped them in load_data.
-        
+        # Auto-backtick column names in formula that are not valid Python identifiers
+        sorted_cols = sorted(df.columns, key=len, reverse=True)
+        for col in sorted_cols:
+            if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', col):
+                escaped_col = re.escape(col)
+                # Match only if not already surrounded by backticks
+                pattern = r'(?<!`)(?<![a-zA-Z0-9_])' + escaped_col + r'(?![a-zA-Z0-9_])(?!`)'
+                formula = re.sub(pattern, f'`{col}`', formula)
+                
         df[name] = df.eval(formula)
         return df
     except Exception as e:
@@ -340,7 +343,10 @@ def to_native(val):
     if pd.isna(val):
         return None
     try:
-        return float(val)
+        fval = float(val)
+        if not np.isfinite(fval):
+            return None
+        return fval
     except:
         return None
 

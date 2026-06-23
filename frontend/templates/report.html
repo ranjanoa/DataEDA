@@ -157,12 +157,24 @@
             font-weight: 600;
             margin-bottom: 20px;
         }
-
         .print-btn:hover { background: #1d4ed8; }
+        .ppt-btn {
+            background: #7c3aed;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-bottom: 20px;
+            margin-left: 10px;
+        }
+        .ppt-btn:hover { background: #6d28d9; }
     </style>
 </head>
 <body>
     <button class="print-btn no-print" onclick="window.print()">Print to PDF</button>
+    <button id="btnExportPPT" class="ppt-btn no-print" onclick="exportPPT()">Export to PowerPoint</button>
 
     <header>
         <div>
@@ -271,5 +283,38 @@
     <footer>
         DataEda - Professional Edition | &copy; 2026 Process Analytics Suite
     </footer>
+    <script>
+    async function exportPPT() {
+      const btn = document.getElementById('btnExportPPT');
+      btn.disabled = true; btn.textContent = '⏳ Generating...';
+      try {
+        const payload = {
+          title: document.title,
+          date: new Date().toLocaleDateString(),
+          ai_summary: {{ ai_summary | tojson if ai_summary else '""' }}
+        };
+        const res = await fetch('/export-pptx', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) { const j = await res.json(); throw new Error(j.message || 'Export failed'); }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'DataEDA_Report.pptx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch(e) {
+        alert('Export failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📊 Export as PPT';
+      }
+    }
+    </script>
 </body>
 </html>
