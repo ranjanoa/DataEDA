@@ -48,3 +48,8 @@ DataEDA.msix
 DataEDA.spec
 project/
 
+# Data files
+*.csv
+*.xlsx
+
+
