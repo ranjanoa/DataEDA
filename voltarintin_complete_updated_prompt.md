@@ -12,19 +12,19 @@
 
 > **DATA CONTEXT REFERENCE** (baseline ranges summary including new stream variables):
 > - **Clinker Production**: mean = 146.71 t/h | Q1 = 149.60 | Q3 = 162.42 | max = 182.55 | **6.5% shutdowns**
-> - **Flour Feed (Flour_Flow_Rate_Oven)**: mean = 245 | Q1 = 249.81 | Q3 = 271.52 | max = 319.04 t/h
-> - **Main Coke (Coke_Flow_Rate_Torch)**: mean = 5.52 | stable 5.48–6.02 t/h | max = 7.78
+> - **Flour Feed (Flour_Flow_Rate_Oven)**: mean = 252.57 | Q1 = 249.80 | Q3 = 271.48 | max = 343.37 t/h
+> - **Main Coke (Coke_Flow_Rate_Torch)**: mean = 5.51 | stable 5.49–6.00 t/h | max = 7.76
 > - **Pre-cal Coke**: mean = 8.19 | stable 7.12–9.96 t/h | max = 13.95
 > - **O2 Cyclone Tower**: mean = 3.50 | stable 2.35–3.38% | objective = 3.0%
 > - **CO Cyclone Tower**: mean = 0.11 | stable 0.10–0.13% | **max constraint = 0.14%**
 > - **NOx Cyclone Tower**: mean = 440 | stable 365–513 | max constraint = 600 mg/Nm³
-> - **Pyrometer**: mean = 913°C | stable 855–1001°C | **target = 1050°C | min constraint = 950°C**
-> - **Material Temp A55**: mean = 867°C | stable 855–920°C
-> - **Oven Fan Speed**: mean = 64.63% | stable 65.67–69.74% | max = 100%
-> - **Oven Head Pressure**: mean = -2 mmH2O | stable -4 to -1 mmH2O
-> - **Smoke Box Inlet Pressure**: mean = -22 mmH2O | stable -25 to -18 mmH2O
-> - **Air Temperature Outlet Cooler**: mean = 180°C | stable 120–250°C
-> - **Temperature 1 Filter Inlet**: mean = 140°C | stable 120–165°C
+> - **Pyrometer**: mean = 913.7°C | stable 855–1001°C | **target = 1050°C | min constraint = 950°C**
+> - **Material Temp A55**: mean = 866.7°C | stable 855–920°C
+> - **Oven Fan Speed**: mean = 84.26% | stable 85.00–91.99% | max = 100%
+> - **Oven Head Pressure**: mean = 0.19 mmH2O | stable 0.10 to 0.31 mmH2O
+> - **Smoke Box Inlet Pressure**: mean = -2.52 mmH2O | stable -3.35 to -1.91 mmH2O
+> - **Air Temperature Outlet Cooler**: mean = 371.11°C | stable 360.87–409.09°C
+> - **Temperature 1 Filter Inlet**: mean = 156.62°C | stable 130.96–209.64°C
 > - **Main Torch Axial Air Pressure**: mean = 2.5 bar | stable 2.0–3.0 bar
 > - **Transport Line Pressure**: mean = 1.8 bar | stable 1.5–2.2 bar
 > - **Pre-Cal Blower Pressure**: mean = 180 mbar | stable 150–220 mbar
@@ -75,15 +75,15 @@ The following derived KPIs already exist in the dataset:
 - Main_Fuel_Share = Coke_Flow_Rate_Torch / Total_Fuel_Flow (~40% at mean)
 
 Confirmed statistics:
-- Clinker Production: mean=146.71, Q1=149.60, Q3=162.42, max=182.55 t/h (6.5% zeros/shutdowns)
-- Flour Feed: mean=245, Q1=249.81, Q3=271.52, max=319.04 t/h (represented by Flour_Flow_Rate_Oven)
-- Main Burner Coke (Coke_Flow_Rate_Torch): mean=5.52, stable range 5.48–6.02 t/h, max=7.78
+- Clinker Production: mean=146.71, Q1=149.60, Q3=162.42, max=182.55 t/h (6.51% zeros/shutdowns)
+- Flour Feed: mean=252.57, Q1=249.80, Q3=271.48, max=343.37 t/h (represented by Flour_Flow_Rate_Oven)
+- Main Burner Coke (Coke_Flow_Rate_Torch): mean=5.51, stable range 5.49–6.00 t/h, max=7.76
 - Pre-cal Coke Flow: mean=8.19, stable range 7.12–9.96 t/h, max=13.95
-- Oven Fan Speed: mean=64.63%, stable range 65.67–69.74%, max=100%
-- Oven Head Pressure: mean = -2 mmH2O | stable range -4 to -1 mmH2O
-- Smoke Box Inlet Pressure: mean = -22 mmH2O | stable range -25 to -18 mmH2O
-- Air Temperature Outlet Cooler: mean = 180°C | stable range 120–250°C
-- Temperature 1 Filter Inlet: mean = 140°C | stable range 120–165°C
+- Oven Fan Speed: mean=84.26%, stable range 85.00–91.99%, max=100%
+- Oven Head Pressure: mean = 0.19 mmH2O | stable range 0.10 to 0.31 mmH2O
+- Smoke Box Inlet Pressure: mean = -2.52 mmH2O | stable range -3.35 to -1.91 mmH2O
+- Air Temperature Outlet Cooler: mean = 371.11°C | stable range 360.87–409.09°C
+- Temperature 1 Filter Inlet: mean = 156.62°C | stable range 130.96–209.64°C
 - Correlation: Flour_Flow_Rate_Oven vs Clinker_Production = +0.997 (near-perfect LOI-mass balance)
 - Correlation: Coke_Flow_Rate_Torch vs Clinker_Production = +0.881
 - Correlation: Pre-cal_Coke_Flow_Rate vs Clinker_Production = +0.772
@@ -318,13 +318,13 @@ Determine the optimal precalciner fuel split target range and heat recovery leve
 | Check_O2_Cyclone_Tower | 0 | 2.35 | 3.5 | 3.38 | 23.17 | Slightly above objective | 2.8–3.3% |
 | Check_CO_Cyclone_Tower | 0 | 0.10 | 0.11 | 0.13 | 0.91 | At limit in spikes | <0.12% |
 | Check_NOx_Cyclone_Tower | 0 | 365 | 440 | 514 | 2020 | Within constraint | 365–500 |
-| Optical_Pyrometer_Temp._Burning_Zone | 600 | 855 | 913 | 1001 | 1265 | 37°C BELOW minimum | 980–1050°C |
+| Optical_Pyrometer_Temp._Burning_Zone | 600 | 855 | 913.7 | 1001 | 1265 | 37°C BELOW minimum | 980–1050°C |
 | Material_Temp_Cyclone_A55 | 42 | 855 | 867 | 920 | 1372 | Low end | 880–920°C |
-| Oven_Fan_Speed | 0 | 65.7 | 64.6 | 69.7 | 100 | Within range | 65–68% |
-| Oven_Head_Pressure | -20 | -4 | -2 | -1 | 10 | Danger of positive gas leaks | -5 to -2 mmH2O |
-| Smoke_Box_Inlet_Pressure | -40 | -25 | -22 | -18 | 0 | High draft drop | -25 to -20 mmH2O |
-| Air_Temperature_Outlet_Cooler | 50 | 120 | 180 | 250 | 450 | Low thermal recovery | >250°C |
-| Temperature_1_Filter_Inlet | 80 | 120 | 140 | 165 | 220 | Danger of filter bag melt | <170°C |
+| Oven_Fan_Speed | 0 | 85.0 | 84.3 | 92.0 | 100 | Within range | 85–90% |
+| Oven_Head_Pressure | 0.0 | 0.10 | 0.19 | 0.31 | 5.3 | Stable slight positive hood | 0.15 to 0.30 mmH2O |
+| Smoke_Box_Inlet_Pressure | -3.4 | -3.35 | -2.52 | -1.91 | 0 | Low draft resistance | -3.0 to -2.0 mmH2O |
+| Air_Temperature_Outlet_Cooler | 50 | 360.9 | 371.1 | 409.1 | 645 | Excellent secondary preheat | >380°C |
+| Temperature_1_Filter_Inlet | 80 | 131.0 | 156.6 | 209.6 | 266 | Approaching baghouse limit | <165°C |
 | Main_Torch_Axial_Air_Pressure | 1.0 | 2.0 | 2.5 | 3.0 | 4.0 | Controlled flame shape | 2.2–2.8 bar |
 | Transport_Line_Pressure | 0.8 | 1.5 | 1.8 | 2.2 | 3.0 | Stable fuel transport | 1.6–2.0 bar |
 | Pre-Cal_Blower_Pressure | 100 | 150 | 180 | 220 | 350 | Calciner draft resistance | 160–200 mbar |
@@ -413,22 +413,22 @@ State the complete operating window as a filled table:
 | Variable | Golden Batch Lower | Golden Batch Upper | Current Mean | Gap |
 |---|---|---|---|---|
 | Clinker_Production | 160 | 182 | 146.71 | +13–35 t/h |
-| Flour_Flow_Rate_Oven | 262 | 275 | 245 | +17–30 t/h |
+| Flour_Flow_Rate_Oven | 262 | 275 | 252.57 | +10–22 t/h |
 | Total_Fuel_Flow | 12.0 | 13.5 | 13.71 | −0.2 t/h |
 | Specific_Fuel_Consumption | 0.075 | 0.085 | 0.094 | −0.009 to −0.019 t/t |
-| Coke_Flow_Rate_Torch | 5.5 | 5.9 | 5.52 | near optimal |
+| Coke_Flow_Rate_Torch | 5.5 | 5.9 | 5.51 | near optimal |
 | Pre-cal_Coke_Flow_Rate | 7.5 | 9.0 | 8.19 | near optimal |
 | Precalciner_Fuel_Share | 57 | 62 | ~60 | near optimal |
 | Check_O2_Cyclone_Tower | 2.5 | 3.3 | 3.5 | slightly above |
 | Check_CO_Cyclone_Tower | 0.08 | 0.12 | 0.11 | watch carefully |
 | Check_NOx_Cyclone_Tower | 365 | 480 | 440 | within range |
-| Optical_Pyrometer_Temp._Burning_Zone | 980 | 1050 | 913 | **+67 to +137°C DEFICIT** |
-| Material_Temp_Cyclone_A55 | 880 | 920 | 867 | +13 to +53°C |
-| Oven_Fan_Speed | 65 | 68 | 64.6 | near optimal |
-| Oven_Head_Pressure | -5 | -2 | -2 | near optimal |
-| Smoke_Box_Inlet_Pressure | -25 | -20 | -22 | within range |
-| Air_Temperature_Outlet_Cooler | 220 | 300 | 180 | +40 to +120°C |
-| Temperature_1_Filter_Inlet | 120 | 170 | 140 | within safety |
+| Optical_Pyrometer_Temp._Burning_Zone | 980 | 1050 | 913.7 | **+66 to +136°C DEFICIT** |
+| Material_Temp_Cyclone_A55 | 880 | 920 | 866.7 | +13 to +53°C |
+| Oven_Fan_Speed | 85 | 90 | 84.3 | near optimal |
+| Oven_Head_Pressure | 0.15 | 0.30 | 0.19 | near optimal |
+| Smoke_Box_Inlet_Pressure | -3.0 | -2.0 | -2.52 | within range |
+| Air_Temperature_Outlet_Cooler | 380 | 420 | 371.1 | +9 to +49°C |
+| Temperature_1_Filter_Inlet | 130 | 165 | 156.6 | within safety |
 | Main_Torch_Axial_Air_Pressure | 2.2 | 2.8 | 2.5 | near optimal |
 | Transport_Line_Pressure | 1.6 | 2.0 | 1.8 | within range |
 | Pre-Cal_Blower_Pressure | 160 | 200 | 180 | within range |
