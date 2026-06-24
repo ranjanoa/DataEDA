@@ -472,6 +472,8 @@
         <div id="aiStatus" class="text-sm text-gray-600 mr-auto">Status: Ready</div>
         <button id="btnCopyAI" onclick="copyAIResponse()"
           class="hidden bg-slate-800 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-slate-700 transition duration-150">📋 Copy</button>
+        <button id="btnExportAIChartsHTML" onclick="exportAIChartsHTML()"
+          class="hidden bg-emerald-600 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-emerald-700 transition duration-150">🌐 Export Charts HTML</button>
         <button id="btnExportPPT" onclick="exportPPT()"
           class="hidden bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-sm hover:bg-purple-700 transition duration-150">📊 Export PPT</button>
         <button id="btnGenerateAI"
@@ -1295,6 +1297,9 @@
       el('aiStatus').innerText = "Status: Thinking...";
       el('aiResponseOutput').innerText = "Generating analysis based on current stats...";
       el('btnGenerateAI').disabled = true;
+      el('btnCopyAI').classList.add('hidden');
+      el('btnExportAIChartsHTML').classList.add('hidden');
+      el('btnExportPPT').classList.add('hidden');
 
       const fd = new FormData();
       fd.append('query', query);
@@ -1326,6 +1331,7 @@
         await parseAndRenderAIResponse(_rawAIResponse, el('aiResponseOutput'));
         el('aiStatus').innerText = "Status: Ready";
         el('btnCopyAI').classList.remove('hidden');
+        el('btnExportAIChartsHTML').classList.remove('hidden');
         el('btnExportPPT').classList.remove('hidden');
       } catch (e) {
         console.error(e);
@@ -1706,6 +1712,27 @@
         btn.textContent = '✅ Copied!';
         setTimeout(() => btn.textContent = '📋 Copy', 2000);
       });
+    }
+
+    function exportAIChartsHTML() {
+      const plotBlocks = document.querySelectorAll('.ai-plot-block');
+      if (plotBlocks.length === 0) {
+        alert("No AI charts found to export.");
+        return;
+      }
+      let count = 0;
+      plotBlocks.forEach((block, idx) => {
+        const titleEl = block.querySelector('.ai-plot-title');
+        const plotEl = block.querySelector('[id^="ai-plot-"]');
+        if (plotEl && plotEl.data && plotEl.layout) {
+          const title = titleEl ? titleEl.textContent.trim().toLowerCase().replace(/[^a-z0-9]/gi, '_') : `ai_chart_${idx}`;
+          exportPlotHTML(plotEl, title);
+          count++;
+        }
+      });
+      if (count === 0) {
+        alert("No active interactive plots found in the AI response to export.");
+      }
     }
 
     async function exportPPT() {
