@@ -23,8 +23,8 @@ def load_data(file_content: bytes, filename: str) -> pd.DataFrame:
         else:
             raise ValueError("Unsupported file format")
         
-        # clean column names
-        df.columns = df.columns.astype(str).str.strip()
+        # Standardize column names (strip whitespace and replace spaces with underscores)
+        df.columns = df.columns.astype(str).str.strip().str.replace(' ', '_')
         
         # Try to identify timestamp column
         # Heuristic: look for 'time' or 'date' in column name, or check first column
@@ -38,8 +38,25 @@ def load_data(file_content: bytes, filename: str) -> pd.DataFrame:
             # Fallback to first column
             time_col = df.columns[0]
             
-        # Parse timestamps (dayfirst=True to handle dd/mm/yyyy format correctly and avoid warnings)
-        df[time_col] = pd.to_datetime(df[time_col], errors='coerce', dayfirst=True)
+        # Dynamically detect date format (DD/MM/YYYY vs MM/DD/YYYY vs YYYY-MM-DD)
+        sample = df[time_col].dropna().astype(str).head(1000)
+        is_day_first = True  # Default assumption for European format
+        import re
+        for s in sample:
+            nums = re.findall(r'\d+', s)
+            if len(nums) >= 2:
+                if len(nums[0]) == 4:  # YYYY-MM-DD
+                    is_day_first = False
+                    break
+                first, second = int(nums[0]), int(nums[1])
+                if first > 12:  # DD/MM/YYYY
+                    is_day_first = True
+                    break
+                elif second > 12:  # MM/DD/YYYY
+                    is_day_first = False
+                    break
+
+        df[time_col] = pd.to_datetime(df[time_col], errors='coerce', dayfirst=is_day_first)
         df = df.dropna(subset=[time_col])
         df = df.sort_values(by=time_col)
         df = df.rename(columns={time_col: 'timestamp'})
