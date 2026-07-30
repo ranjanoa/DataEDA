@@ -51,5 +51,10 @@ project/
 # Data files
 *.csv
 *.xlsx
+*.zip
+*.exe
+
+# Environment
+.env
 
 

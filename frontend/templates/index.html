@@ -1780,8 +1780,14 @@
         });
 
         if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.message || 'Export failed');
+          let msg = `Export failed (${res.status})`;
+          try {
+            const errData = await res.json();
+            msg = errData.message || msg;
+          } catch (_) {
+            try { msg = await res.text(); } catch (_) {}
+          }
+          throw new Error(msg);
         }
 
         const blob = await res.blob();

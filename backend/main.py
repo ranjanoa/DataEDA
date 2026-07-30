@@ -349,6 +349,37 @@ async def get_heatmap(method: str = 'pearson'):
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
+def enrich_ai_context(df: Optional[pd.DataFrame], query_str: str, ctx_str: str) -> str:
+    if df is None or df.empty:
+        return ctx_str
+    try:
+        from report_generator import compute_stats, compute_correlations
+        stats = compute_stats(df)
+        corrs = compute_correlations(df)
+        num_cols = list(stats.keys())
+        
+        stats_lines = [f"{col}: Min={s['min']:.2f}, Q1={s['q1']:.2f}, Median={s['median']:.2f}, Mean={s['mean']:.2f}, Q3={s['q3']:.2f}, Max={s['max']:.2f}" for col, s in list(stats.items())[:15]]
+        corr_lines = [f"{c1} vs {c2}: corr={val:+.3f}" for c1, c2, val in corrs[:8]]
+        
+        enriched = f"{ctx_str}\n\n=== DATASET STATISTICS SUMMARY ===\n" + "\n".join(stats_lines)
+        if corr_lines:
+            enriched += "\n\n=== TOP VARIABLE CORRELATIONS ===\n" + "\n".join(corr_lines)
+        enriched += f"\n\nAVAILABLE VARIABLES IN DATASET: {', '.join(num_cols)}"
+        enriched += "\n\nINSTRUCTIONS FOR REPORT GENERATION:\n" \
+                    "- If generating a process optimization report, follow a comprehensive 16-step engineering structure starting with Executive Summary.\n" \
+                    "- Include exact chart tags for interactive Plotly charts using valid dataset variables:\n" \
+                    "  [SCATTER: X=Var1 | Y=Var2 | COLOR=Var3 | SCALE=Jet]\n" \
+                    "  [SCATTER3D: X=Var1 | Y=Var2 | Z=Var3 | COLOR=Var4 | SCALE=Jet]\n" \
+                    "  [PARALLEL: Var1, Var2, Var3, Var4 | COLOR: VarColor]\n" \
+                    "  [DUALPLOT: Var1, Var2 | Var3, Var4]\n" \
+                    "  [BOX: Var1, Var2, Var3]\n" \
+                    "  [HISTOGRAM: Var1, Var2]\n" \
+                    "- Use exact calculated numbers from dataset statistics in markdown summary tables and bullet points."
+        return enriched
+    except Exception as e:
+        logging.error(f"Error enriching AI context: {e}")
+        return ctx_str
+
 @app.post("/ai-query")
 async def ai_query(
     query: str = Form(...),
@@ -358,111 +389,81 @@ async def ai_query(
     base_url: Optional[str] = Form(None)
 ):
     import requests
+    full_context = enrich_ai_context(current_df, query, context)
     try:
         if provider == "gemini":
-            if not api_key:
-                logging.info("No API Key provided. Falling back to local report generation...")
+            env_key = None
+            env_path = get_resource_path(".env")
+            if os.path.exists(env_path):
                 try:
-                    from report_generator import generate_local_report
-                    if current_df is not None:
-                        content = generate_local_report(current_df, query)
-                        return {"choices": [{"message": {"content": content}}]}
-                except Exception as local_err:
-                    logging.error(f"Local report generation failed: {local_err}")
-                return JSONResponse(status_code=400, content={"message": "API Key required for Gemini provider"})
-            
-            def call_gemini(model):
-                target_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key.strip()}"
+                    with open(env_path, "r", encoding="utf-8") as ef:
+                        for eline in ef:
+                            if eline.startswith("GEMINI_API_KEY=") or eline.startswith("GOOGLE_API_KEY="):
+                                k = eline.split("=", 1)[1].strip()
+                                if k:
+                                    env_key = k
+                                    break
+                except Exception:
+                    pass
+            if not env_key:
+                env_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+            def call_gemini(model, target_key):
+                target_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={target_key.strip()}"
                 headers = { "Content-Type": "application/json" }
                 payload = {
                     "contents": [{
                         "parts": [{
-                            "text": f"System: You are a data analysis assistant for kiln process monitoring.\nContext:\n{context}\n\nQuery: {query}"
+                            "text": f"System: You are a data analysis assistant for kiln process monitoring.\nContext:\n{full_context}\n\nQuery: {query}"
                         }]
                     }]
                 }
                 logging.info(f"Sending AI Query to Gemini API using model: {model}")
-                return requests.post(target_url, headers=headers, json=payload, timeout=30)
+                return requests.post(target_url, headers=headers, json=payload, timeout=12)
 
-            # Try the default model first (gemini-3-flash is the user's preferred model)
-            response = None
-            try:
-                response = call_gemini("gemini-3-flash")
-            except Exception as e:
-                logging.error(f"Primary Gemini call failed: {e}")
-            
-            # If 404/not found, dynamically list models and pick a supported flash/pro model
-            if response is None or response.status_code == 404 or "not found" in response.text.lower():
-                logging.info("Gemini default model not found. Fetching available models...")
-                try:
-                    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key.strip()}"
-                    list_resp = requests.get(list_url, timeout=10)
-                    if list_resp.ok:
-                        models_data = list_resp.json()
-                        models_list = models_data.get("models", [])
-                        available_models = []
-                        for m in models_list:
-                            name = m.get("name", "")
-                            methods = m.get("supportedGenerationMethods", [])
-                            if name and "generateContent" in methods:
-                                available_models.append(name.split("/")[-1])
-                        
-                        logging.info(f"Available Gemini models supporting generateContent: {available_models}")
-                        
-                        fallback_model = None
-                        # Prefer 3-flash, 3-flash-preview, 3.0-flash, 3.5-flash, 2.5-flash, 2.0-flash, 1.5-flash
-                        for pref in ["gemini-3-flash", "gemini-3-flash-preview", "gemini-3.0-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
-                            if pref in available_models:
-                                fallback_model = pref
-                                break
-                        if not fallback_model:
-                            for m in available_models:
-                                if "flash" in m:
-                                    fallback_model = m
-                                    break
-                        if not fallback_model:
-                            for m in available_models:
-                                if "pro" in m:
-                                    fallback_model = m
-                                    break
-                        if not fallback_model and available_models:
-                            fallback_model = available_models[0]
-                            
-                        if fallback_model:
-                            logging.info(f"Falling back to model: {fallback_model}")
-                            response = call_gemini(fallback_model)
-                except Exception as list_err:
-                    logging.error(f"Error listing Gemini models: {list_err}")
-            
-            # Secondary fallback with static list of common models if response is still not ok
-            if response is None or not response.ok:
-                static_fallbacks = ["gemini-3-flash", "gemini-3-flash-preview", "gemini-3.0-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-3.5-pro", "gemini-2.5-pro", "gemini-1.5-pro"]
-                for model in static_fallbacks:
-                    logging.info(f"Static fallback: Trying {model}")
-                    try:
-                        fallback_resp = call_gemini(model)
-                        if fallback_resp.ok:
-                            response = fallback_resp
-                            break
-                    except Exception as fallback_err:
-                        logging.error(f"Fallback model {model} failed with: {fallback_err}")
-            
-            if response is None or not response.ok:
-                status_code = response.status_code if response is not None else 500
-                error_text = response.text if response is not None else "Timeout / network error"
-                error_msg = f"Gemini Error ({status_code}): {error_text}"
-                logging.error(error_msg)
-                
-                # Perform local fallback on any API error/failure
-                logging.info("Gemini call failed. Falling back to local report generation...")
+            # Try active keys (provided key first, then env key if available)
+            keys_to_try = []
+            if api_key and api_key.strip():
+                keys_to_try.append(api_key.strip())
+            if env_key and env_key.strip() and env_key.strip() not in keys_to_try:
+                keys_to_try.append(env_key.strip())
+            if not keys_to_try:
+                logging.info("No API Key provided. Instantly generating local report...")
                 try:
                     from report_generator import generate_local_report
-                    if current_df is not None:
-                        content = generate_local_report(current_df, query)
-                        return {"choices": [{"message": {"content": content}}]}
+                    df_for_report = current_df if current_df is not None else pd.DataFrame()
+                    content = generate_local_report(df_for_report, query)
+                    return {"choices": [{"message": {"content": content}}]}
                 except Exception as local_err:
                     logging.error(f"Local report generation failed: {local_err}")
-                return JSONResponse(status_code=status_code, content={"message": error_msg})
+                return JSONResponse(status_code=400, content={"message": "API Key required for Gemini provider"})
+
+            response = None
+            fast_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+            for current_key in keys_to_try:
+                for model in fast_models:
+                    try:
+                        res = call_gemini(model, current_key)
+                        if res.ok:
+                            response = res
+                            break
+                    except Exception as e:
+                        logging.error(f"Gemini call failed for model {model}: {e}")
+                if response and response.ok:
+                    break
+
+            if response is None or not response.ok:
+                logging.info("Gemini call unavailable or failed. Instantly generating local report fallback...")
+                try:
+                    from report_generator import generate_local_report
+                    df_for_report = current_df if current_df is not None else pd.DataFrame()
+                    content = generate_local_report(df_for_report, query)
+                    return {"choices": [{"message": {"content": content}}]}
+                except Exception as local_err:
+                    logging.error(f"Local report generation failed: {local_err}")
+                status_code = response.status_code if response is not None else 500
+                error_text = response.text if response is not None else "Timeout / network error"
+                return JSONResponse(status_code=status_code, content={"message": f"Gemini Error ({status_code}): {error_text}"})
             
             res_json = response.json()
             try:
@@ -500,6 +501,29 @@ async def ai_query(
 
         else: # Default OpenAI
             if not api_key:
+                api_key = os.getenv("OPENAI_API_KEY")
+                if not api_key:
+                    env_path = get_resource_path(".env")
+                    if os.path.exists(env_path):
+                        try:
+                            with open(env_path, "r", encoding="utf-8") as ef:
+                                for eline in ef:
+                                    if eline.startswith("OPENAI_API_KEY="):
+                                        k = eline.split("=", 1)[1].strip()
+                                        if k:
+                                            api_key = k
+                                            break
+                        except Exception:
+                            pass
+            if not api_key:
+                logging.info("No OpenAI API Key provided. Falling back to local report generation...")
+                try:
+                    from report_generator import generate_local_report
+                    if current_df is not None:
+                        content = generate_local_report(current_df, query)
+                        return {"choices": [{"message": {"content": content}}]}
+                except Exception as local_err:
+                    logging.error(f"Local report generation failed: {local_err}")
                 return JSONResponse(status_code=400, content={"message": "API Key required for OpenAI provider"})
             
             headers = {
@@ -520,6 +544,14 @@ async def ai_query(
             if not response.ok:
                 error_msg = f"OpenAI Error ({response.status_code}): {response.text}"
                 logging.error(error_msg)
+                logging.info("OpenAI call failed. Falling back to local report generation...")
+                try:
+                    from report_generator import generate_local_report
+                    if current_df is not None:
+                        content = generate_local_report(current_df, query)
+                        return {"choices": [{"message": {"content": content}}]}
+                except Exception as local_err:
+                    logging.error(f"Local report generation failed: {local_err}")
                 return JSONResponse(status_code=response.status_code, content={"message": error_msg})
                 
             return response.json()
@@ -843,19 +875,23 @@ async def export_pptx(data: dict = Body(...)):
         return None
 
     try:
-        prs = Presentation()
-        # Set slide dimensions to widescreen (16:9)
-        prs.slide_width = Inches(13.333)
-        prs.slide_height = Inches(7.5)
+        import os
+        template_path = os.path.join(os.path.dirname(__file__), "template.pptx")
+        if os.path.exists(template_path):
+            prs = Presentation(template_path)
+        else:
+            prs = Presentation()
+            # Set slide dimensions to widescreen (16:9)
+            prs.slide_width = Inches(13.333)
+            prs.slide_height = Inches(7.5)
         
         # Slide Layout 6 is blank
         blank_layout = prs.slide_layouts[6]
         
         # 1. Title Slide
         slide = prs.slides.add_slide(blank_layout)
-        fill = slide.background.fill
-        fill.solid()
-        fill.fore_color.rgb = RGBColor(15, 23, 42)
+        # Template background will be used automatically
+
         
         title_box = slide.shapes.add_textbox(Inches(1.0), Inches(2.2), Inches(11.333), Inches(3.5))
         tf = title_box.text_frame
@@ -866,13 +902,13 @@ async def export_pptx(data: dict = Body(...)):
         p.font.name = 'Arial'
         p.font.size = Pt(44)
         p.font.bold = True
-        p.font.color.rgb = RGBColor(6, 182, 212) # Cyan Accent
+        p.font.color.rgb = RGBColor(0, 80, 155) # Votorantim blue-ish or standard dark blue
         
         p2 = tf.add_paragraph()
         p2.text = f"\nDataset: {data.get('dataset_name', 'Uploaded Data')}\nDate: {data.get('date', '')}"
         p2.font.name = 'Arial'
         p2.font.size = Pt(18)
-        p2.font.color.rgb = RGBColor(148, 163, 184) # Slate gray
+        p2.font.color.rgb = RGBColor(100, 100, 100) # Gray
 
         # 2. Parse Markdown Sections
         summary_text = data.get("ai_summary", "")
@@ -887,8 +923,8 @@ async def export_pptx(data: dict = Body(...)):
         
         for line in lines:
             stripped = line.strip()
-            # Detect headers
-            if stripped.startswith('###') or (stripped.startswith('##') and 'STEP' in stripped):
+            # Detect headers (any #, ##, ### header except document title)
+            if (stripped.startswith('##') or stripped.startswith('###') or stripped.startswith('####')) and not stripped.startswith('# Bursa'):
                 if current_section["content"] or current_section["title"]:
                     sections.append(current_section)
                 title = stripped.lstrip('#').strip().replace('**', '').replace('*', '')
@@ -921,12 +957,12 @@ async def export_pptx(data: dict = Body(...)):
                 if b.strip().startswith('-') or b.strip().startswith('*'):
                     p.text = "• " + clean_b.lstrip('-*').strip()
                     p.font.size = Pt(12)
-                    p.font.color.rgb = RGBColor(241, 245, 249)
+                    p.font.color.rgb = RGBColor(50, 50, 50)
                     p.space_before = Pt(4)
                 else:
                     p.text = clean_b
                     p.font.size = Pt(12)
-                    p.font.color.rgb = RGBColor(241, 245, 249)
+                    p.font.color.rgb = RGBColor(50, 50, 50)
                     p.space_before = Pt(6)
                 p.font.name = 'Arial'
 
@@ -951,9 +987,6 @@ async def export_pptx(data: dict = Body(...)):
                     
                     if rows_count > 0 and cols_count > 0:
                         slide = prs.slides.add_slide(blank_layout)
-                        fill = slide.background.fill
-                        fill.solid()
-                        fill.fore_color.rgb = RGBColor(15, 23, 42)
                         
                         # Section Title
                         title_box = slide.shapes.add_textbox(Inches(1.0), Inches(0.4), Inches(11.333), Inches(0.8))
@@ -963,7 +996,8 @@ async def export_pptx(data: dict = Body(...)):
                         p.font.name = 'Arial'
                         p.font.size = Pt(24)
                         p.font.bold = True
-                        p.font.color.rgb = RGBColor(168, 85, 247) # Purple Accent
+                        p.font.color.rgb = RGBColor(0, 80, 155) # Title color
+
                         
                         # Add Native Slide Table
                         left = Inches(1.0)
@@ -983,17 +1017,17 @@ async def export_pptx(data: dict = Body(...)):
                                     # Theme cell fills
                                     cell.fill.solid()
                                     if r_idx == 0:
-                                        cell.fill.fore_color.rgb = RGBColor(30, 41, 59) # Dark Slate Header
+                                        cell.fill.fore_color.rgb = RGBColor(200, 200, 200) # Header gray
                                     else:
-                                        cell.fill.fore_color.rgb = RGBColor(15, 23, 42) # Body dark
+                                        cell.fill.fore_color.rgb = RGBColor(245, 245, 245) # Body light gray
                                         
                                     for paragraph in cell.text_frame.paragraphs:
                                         paragraph.font.name = 'Arial'
                                         paragraph.font.size = Pt(10)
-                                        paragraph.font.color.rgb = RGBColor(241, 245, 249)
+                                        paragraph.font.color.rgb = RGBColor(0, 0, 0)
                                         if r_idx == 0:
                                             paragraph.font.bold = True
-                                            paragraph.font.color.rgb = RGBColor(6, 182, 212) # Cyan header font
+                                            paragraph.font.color.rgb = RGBColor(0, 0, 0)
                                             
                 elif block["type"] == "chart":
                     chart = find_best_chart(block["tag"], ai_charts, used_chart_indices)
@@ -1001,9 +1035,6 @@ async def export_pptx(data: dict = Body(...)):
                     
                     if img_b64:
                         slide = prs.slides.add_slide(blank_layout)
-                        fill = slide.background.fill
-                        fill.solid()
-                        fill.fore_color.rgb = RGBColor(15, 23, 42)
                         
                         # Section Title
                         title_box = slide.shapes.add_textbox(Inches(0.6), Inches(0.4), Inches(12.133), Inches(0.8))
@@ -1013,7 +1044,7 @@ async def export_pptx(data: dict = Body(...)):
                         p.font.name = 'Arial'
                         p.font.size = Pt(24)
                         p.font.bold = True
-                        p.font.color.rgb = RGBColor(6, 182, 212) # Cyan accent
+                        p.font.color.rgb = RGBColor(0, 80, 155)
                         
                         # Left Column: Image
                         try:
@@ -1040,18 +1071,15 @@ async def export_pptx(data: dict = Body(...)):
                     else:
                         # Fallback: Render as text slide if image not found
                         slide = prs.slides.add_slide(blank_layout)
-                        fill = slide.background.fill
-                        fill.solid()
-                        fill.fore_color.rgb = RGBColor(15, 23, 42)
                         
                         title_box = slide.shapes.add_textbox(Inches(1.0), Inches(0.6), Inches(11.333), Inches(0.8))
                         tf = title_box.text_frame
                         p = tf.paragraphs[0]
                         p.text = clean_title(block["title"]) if block["title"] else (sec["title"] or "Process Insights")
                         p.font.name = 'Arial'
-                        p.font.size = Pt(26)
+                        p.font.size = Pt(24)
                         p.font.bold = True
-                        p.font.color.rgb = RGBColor(168, 85, 247) # Purple accent
+                        p.font.color.rgb = RGBColor(0, 80, 155)
                         
                         content_box = slide.shapes.add_textbox(Inches(1.0), Inches(1.5), Inches(11.333), Inches(5.2))
                         tf_content = content_box.text_frame
@@ -1063,9 +1091,6 @@ async def export_pptx(data: dict = Body(...)):
                         
                 elif block["type"] == "text":
                     slide = prs.slides.add_slide(blank_layout)
-                    fill = slide.background.fill
-                    fill.solid()
-                    fill.fore_color.rgb = RGBColor(15, 23, 42)
                     
                     title_box = slide.shapes.add_textbox(Inches(1.0), Inches(0.6), Inches(11.333), Inches(0.8))
                     tf = title_box.text_frame
@@ -1074,7 +1099,7 @@ async def export_pptx(data: dict = Body(...)):
                     p.font.name = 'Arial'
                     p.font.size = Pt(26)
                     p.font.bold = True
-                    p.font.color.rgb = RGBColor(168, 85, 247) # Purple accent
+                    p.font.color.rgb = RGBColor(0, 80, 155)
                     
                     # Split lines into bullet points
                     bullets = [b.strip() for b in block["content"].split('\n') if b.strip()]

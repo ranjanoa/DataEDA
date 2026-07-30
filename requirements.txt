@@ -7,3 +7,4 @@ openpyxl
 jinja2
 requests
 httpx
+python-pptx
